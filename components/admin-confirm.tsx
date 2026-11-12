@@ -1,0 +1,3 @@
+"use client";
+import { useState } from "react";
+export function AdminConfirm({ id, status }: { id: string; status: string }) { const [message, setMessage] = useState(""); if (status !== "pending_payment") return <span className="text-sm font-semibold text-emerald-700">Đã xác nhận</span>; return <div className="flex flex-col gap-2"><button onClick={async () => { const res = await fetch(`/api/admin/orders/${id}/confirm-payment`, { method: "POST" }); const data = await res.json(); setMessage(res.ok ? "Đã xác nhận — tải lại trang." : data.error); }} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Xác nhận đã nhận tiền</button>{message && <small>{message}</small>}</div>; }
