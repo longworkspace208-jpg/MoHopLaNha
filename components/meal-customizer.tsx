@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
@@ -17,7 +18,7 @@ export function MealCustomizer() {
       return {
         price: total.price + price,
         kcal: total.kcal + nutrition.kcal,
-        protein: total.protein + nutrition.protein
+        protein: total.protein + nutrition.protein,
       };
     },
     { price: 0, kcal: 0, protein: 0 }
@@ -25,99 +26,164 @@ export function MealCustomizer() {
 
   if (!lines.length) {
     return (
-      <div className="rounded-card border border-dashed border-brand-200 bg-white p-5 text-center text-sm text-slate-600 shadow-sm">
-        Chọn một combo hoặc thêm món lẻ ở trên để bắt đầu tùy chỉnh định lượng.
+      <div className="border border-dashed border-forest/30 bg-white/60 p-6 text-sm text-muted">
+        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+          Khay cơm đang trống
+        </p>
+        <p className="mt-2 text-ink leading-relaxed">
+          Chọn một combo gợi ý hoặc bấm <strong>+ Thêm vào khay</strong> ở danh sách món để bắt đầu cân chỉnh gram cho {people} người.
+        </p>
+        <div className="mt-4 pt-3 border-t border-rule text-xs text-muted flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-forest"></span>
+          <span>Định lượng tính theo từng gam thực tế trước khi đóng hộp.</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-black text-brand-950">Tùy chỉnh bữa ăn</h2>
-        <Link
-          href="/cart"
-          className="text-xs font-bold text-orange-600 underline hover:text-orange-700"
-        >
-          Xem chi tiết giỏ hàng →
-        </Link>
-      </div>
-
-      {lines.map((line) => {
-        const totalGrams = line.gramsPerPerson * people;
-        const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
-        const price = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
-        return (
-          <article key={line.dish.id} className="rounded-card bg-white p-4 shadow-soft">
-            <div className="flex gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-brand-50 text-2xl">
-                {line.dish.image_url ? (
-                  line.dish.image_url.startsWith("http") || line.dish.image_url.startsWith("/") ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={line.dish.image_url}
-                        alt={line.dish.name}
-                        className="h-full w-full rounded-xl object-cover"
-                      />
-                    </>
-                  ) : (
-                    line.dish.image_url
-                  )
-                ) : (
-                  "🍱"
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-bold">{line.dish.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {line.gramsPerPerson}g/người · {totalGrams}g cả bữa
-                </p>
-                <p className="mt-1 text-sm font-bold text-brand-700">
-                  {formatVnd(Math.round(price))} · {Math.round(nutrition.kcal)} kcal · P{" "}
-                  {nutrition.protein.toFixed(1)}g
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <button
-                aria-label={`Giảm ${line.dish.name}`}
-                onClick={() => changeGrams(line.dish.id, line.gramsPerPerson - line.dish.step_g)}
-                disabled={line.gramsPerPerson <= line.dish.min_g}
-                className="grid h-10 w-10 place-items-center rounded-full border text-xl disabled:opacity-30"
-              >
-                −
-              </button>
-              <span className="text-sm font-semibold">Bước {line.dish.step_g}g</span>
-              <button
-                aria-label={`Tăng ${line.dish.name}`}
-                onClick={() => changeGrams(line.dish.id, line.gramsPerPerson + line.dish.step_g)}
-                disabled={line.gramsPerPerson >= line.dish.max_g}
-                className="grid h-10 w-10 place-items-center rounded-full bg-brand-700 text-xl text-white disabled:opacity-30"
-              >
-                +
-              </button>
-            </div>
-          </article>
-        );
-      })}
-
-      <section className="rounded-card bg-brand-950 p-5 text-white shadow-md">
-        <p className="text-sm text-brand-100">Tổng cả bữa · {people} người</p>
-        <p className="mt-1 text-2xl font-black">{formatVnd(Math.round(totals.price))}</p>
-        <p className="mt-2 text-sm">
-          {Math.round(totals.kcal)} kcal · Protein {totals.protein.toFixed(1)}g
-        </p>
-        <div className="mt-4 border-t border-brand-700 pt-3 text-sm text-brand-100">
-          Nếu chia đều: {formatVnd(Math.round(totals.price / people))}/người ·{" "}
-          {Math.round(totals.kcal / people)} kcal/người · P{" "}
-          {(totals.protein / people).toFixed(1)}g/người
+    <section className="space-y-6">
+      <div className="flex items-baseline justify-between border-b-2 border-forest pb-3">
+        <div>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-coral">
+            Định lượng khẩu phần
+          </span>
+          <h2 className="mt-0.5 font-display text-2xl font-semibold text-forest">
+            Tùy chỉnh bữa ăn
+          </h2>
         </div>
         <Link
           href="/cart"
-          className="mt-4 block w-full rounded-full bg-orange-500 py-3.5 text-center font-bold text-white shadow-md transition hover:bg-orange-600"
+          className="border-b-2 border-forest pb-0.5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest transition-colors hover:border-coral hover:text-coral"
         >
-          Đến giỏ hàng & Đặt món ({lines.length} món)
+          Xem giỏ hàng →
+        </Link>
+      </div>
+
+      <div className="divide-y divide-rule border-b border-rule">
+        {lines.map((line) => {
+          const totalGrams = line.gramsPerPerson * people;
+          const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
+          const price = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
+          const canDecrease = line.gramsPerPerson > line.dish.min_g;
+          const canIncrease = line.gramsPerPerson < line.dish.max_g;
+
+          return (
+            <article key={line.dish.id} className="py-4">
+              <div className="flex items-start gap-3.5">
+                <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white shadow-sm">
+                  {line.dish.image_url ? (
+                    line.dish.image_url.startsWith("http") ||
+                    line.dish.image_url.startsWith("/") ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={line.dish.image_url}
+                          alt={line.dish.name}
+                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                        />
+                      </>
+                    ) : (
+                      <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
+                    )
+                  ) : (
+                    <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="font-display text-lg font-semibold text-ink">
+                      {line.dish.name}
+                    </h3>
+                    <span className="shrink-0 font-mono text-base font-bold tabular-nums text-coral">
+                      {formatVnd(Math.round(price))}
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-muted">
+                    <strong className="text-forest font-semibold">{line.gramsPerPerson}g/người</strong> · {totalGrams}g cả bữa
+                  </p>
+                  <p className="font-mono text-[11px] text-muted">
+                    {Math.round(nutrition.kcal)} kcal · Protein {nutrition.protein.toFixed(1)}g
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3.5 flex items-center justify-between">
+                <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-muted">
+                  Bước cân ±{line.dish.step_g}g
+                </span>
+
+                {/* Bộ điều khiển tăng giảm: tap target 40-44px, affordance rõ ràng */}
+                <div className="flex items-center border border-forest/30 bg-white shadow-sm">
+                  <button
+                    type="button"
+                    aria-label={`Giảm ${line.dish.name}`}
+                    onClick={() =>
+                      changeGrams(
+                        line.dish.id,
+                        line.gramsPerPerson - line.dish.step_g
+                      )
+                    }
+                    disabled={!canDecrease}
+                    className="grid h-10 w-10 place-items-center font-mono text-lg font-bold text-forest transition-colors hover:bg-forest hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-forest"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-20 px-2 text-center font-mono text-xs font-bold tabular-nums text-ink">
+                    {line.gramsPerPerson}g
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Tăng ${line.dish.name}`}
+                    onClick={() =>
+                      changeGrams(
+                        line.dish.id,
+                        line.gramsPerPerson + line.dish.step_g
+                      )
+                    }
+                    disabled={!canIncrease}
+                    className="grid h-10 w-10 place-items-center font-mono text-lg font-bold text-forest transition-colors hover:bg-forest hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-forest"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {/* Bảng tổng hợp Deep Forest Green */}
+      <section className="bg-forest p-6 text-white shadow-sm">
+        <div className="flex items-baseline justify-between border-b border-white/20 pb-3">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-ivory/80">
+            Tạm tính · {people} người ăn
+          </span>
+          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-coral">
+            {lines.length} món đã chọn
+          </span>
+        </div>
+
+        <p className="mt-4 font-display text-3xl font-semibold tracking-tight text-white">
+          {formatVnd(Math.round(totals.price))}
+        </p>
+        <p className="mt-1 font-mono text-xs text-ivory/90">
+          ≈ {Math.round(totals.kcal)} kcal · Protein {totals.protein.toFixed(1)}g (ước tính)
+        </p>
+
+        <div className="mt-4 border-t border-white/15 pt-3 font-mono text-[11px] text-ivory/70">
+          Chia đều mỗi người: {formatVnd(Math.round(totals.price / people))} ·{" "}
+          {Math.round(totals.kcal / people)} kcal · P {(totals.protein / people).toFixed(1)}g
+        </div>
+
+        {/* Primary CTA Coral Orange */}
+        <Link
+          href="/cart"
+          className="mt-6 flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2"
+        >
+          <span>Đến giỏ hàng &amp; đặt món ({lines.length} món)</span>
+          <span aria-hidden="true">→</span>
         </Link>
       </section>
     </section>

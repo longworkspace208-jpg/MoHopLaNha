@@ -75,174 +75,191 @@ export default async function PublicNutritionSnapshotPage({
   ).filter(Boolean);
 
   return (
-    <main className="min-h-screen bg-brand-950 px-4 py-6">
-      <article className="mx-auto w-full max-w-md rounded-[2rem] bg-cream p-5 shadow-2xl sm:p-6">
-        <header className="border-b border-brand-100 pb-4">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-orange-600">
-            Mở Hộp Là Nhà · Minh bạch dinh dưỡng
-          </p>
-          <h1 className="mt-2 text-2xl font-black leading-tight text-brand-950">
+    <main className="min-h-screen bg-forest px-4 py-8 sm:py-12">
+      <article className="mx-auto w-full max-w-lg border-2 border-forest-dark bg-ivory p-6 shadow-2xl sm:p-8">
+        <header className="border-b-2 border-forest pb-5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+              Mở Hộp Là Nhà · Minh bạch dinh dưỡng
+            </p>
+            <span className="bg-forest px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+              Snapshot
+            </span>
+          </div>
+
+          <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-forest">
             {portion.dishName}
           </h1>
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-brand-950 px-3 py-1 font-mono text-xs font-bold text-white">
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-xs">
+            <span className="bg-forest px-3 py-1 font-bold text-white shadow-sm">
               Mã suất: {portion.qrCode}
             </span>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-800">
+            <span className="border border-forest bg-white px-3 py-1 font-bold text-forest shadow-sm">
               Cân thực tế: {portion.actualGrams}g
             </span>
           </div>
         </header>
 
         {/* Định lượng thực & thời gian chế biến / đóng gói */}
-        <section className="mt-4 grid grid-cols-2 gap-2.5 rounded-2xl bg-white p-4 shadow-sm">
-          <div>
-            <p className="text-[11px] font-medium text-slate-500">Định lượng thực</p>
-            <p className="mt-0.5 text-lg font-black text-brand-950">
+        <section className="grid grid-cols-2 divide-x divide-rule border-b border-rule">
+          <div className="py-4 pr-4">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+              Định lượng thực
+            </p>
+            <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-coral">
               {portion.actualGrams}g
             </p>
           </div>
-          <div>
-            <p className="text-[11px] font-medium text-slate-500">Ngày chế biến</p>
-            <p className="mt-0.5 text-sm font-bold text-slate-800">
+          <div className="py-4 pl-4">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+              Ngày chế biến
+            </p>
+            <p className="mt-1 font-mono text-sm font-bold text-ink">
               {formatDateVi(portion.cookedAt)}
             </p>
           </div>
-          <div className="col-span-2 border-t border-slate-100 pt-2.5">
-            <p className="text-[11px] font-medium text-slate-500">
+          <div className="col-span-2 border-t border-rule py-3.5">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
               Thời điểm đóng gói
             </p>
-            <p className="mt-0.5 text-sm font-bold text-slate-800">
+            <p className="mt-0.5 font-mono text-sm font-semibold text-ink">
               {formatDateTimeVi(portion.packedAt)}
             </p>
           </div>
         </section>
 
         {/* Thành phần dinh dưỡng (ước tính) */}
-        <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+        <section className="border-b border-rule py-5">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-black text-brand-950">
-              Dinh dưỡng khẩu phần (ước tính)
+            <h2 className="font-display text-xl font-semibold text-forest">
+              Dinh dưỡng khẩu phần
             </h2>
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
               Giá trị ước tính
             </span>
           </div>
 
-          <div className="mt-3 rounded-xl bg-brand-50 p-3 text-center">
-            <p className="text-xs font-semibold text-brand-800">
-              Năng lượng — Calories (ước tính)
-            </p>
-            <p className="mt-0.5 text-2xl font-black text-brand-950">
-              {portion.kcal} kcal
-            </p>
+          <div className="mt-4 border border-rule bg-white p-4 shadow-sm">
+            <div className="flex items-baseline justify-between border-b border-rule pb-3">
+              <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                Năng lượng (ước tính)
+              </span>
+              <strong className="font-mono text-2xl font-bold tabular-nums text-forest">
+                {portion.kcal} kcal
+              </strong>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 divide-x divide-rule text-center">
+              <div className="pr-2">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Protein
+                </p>
+                <p className="mt-1 font-mono text-base font-bold tabular-nums text-forest">
+                  {portion.proteinG}g
+                </p>
+              </div>
+              <div className="px-2">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Carbs
+                </p>
+                <p className="mt-1 font-mono text-base font-bold tabular-nums text-ink">
+                  {portion.carbsG}g
+                </p>
+              </div>
+              <div className="pl-2">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Fat
+                </p>
+                <p className="mt-1 font-mono text-base font-bold tabular-nums text-coral">
+                  {portion.fatG}g
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-slate-50 p-2.5">
-              <p className="text-[11px] font-semibold text-slate-500">
-                Protein (ước tính)
-              </p>
-              <p className="mt-0.5 text-base font-black text-emerald-700">
-                {portion.proteinG}g
-              </p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-2.5">
-              <p className="text-[11px] font-semibold text-slate-500">
-                Carbs (ước tính)
-              </p>
-              <p className="mt-0.5 text-base font-black text-amber-800">
-                {portion.carbsG}g
-              </p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-2.5">
-              <p className="text-[11px] font-semibold text-slate-500">
-                Fat (ước tính)
-              </p>
-              <p className="mt-0.5 text-base font-black text-sky-700">
-                {portion.fatG}g
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-3 text-xs leading-relaxed text-muted">
             Số liệu dinh dưỡng là giá trị <strong>ước tính</strong> theo công thức
             nguyên liệu và định lượng cân thực tế tại thời điểm đóng gói.
           </p>
         </section>
 
         {/* Nguyên liệu & chất gây dị ứng */}
-        <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-black text-brand-950">
-            Nguyên liệu & chất gây dị ứng
+        <section className="border-b border-rule py-5">
+          <h2 className="font-display text-xl font-semibold text-forest">
+            Nguyên liệu &amp; chất gây dị ứng
           </h2>
 
           {portion.ingredients && portion.ingredients.length > 0 ? (
-            <ul className="mt-2.5 divide-y divide-slate-100 text-sm text-slate-700">
+            <ul className="mt-3 divide-y divide-rule text-sm">
               {portion.ingredients.map((ing, idx) => (
                 <li
                   key={`${ing.name}-${idx}`}
-                  className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"
+                  className="flex items-baseline justify-between gap-2 py-2.5"
                 >
-                  <span className="font-medium text-slate-800">
+                  <span className="font-medium text-ink">
                     {ing.name}
                     {ing.allergens && ing.allergens.length > 0 && (
-                      <span className="ml-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                        Dị ứng: {ing.allergens.join(", ")}
+                      <span className="ml-2 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-coral">
+                        [Dị ứng: {ing.allergens.join(", ")}]
                       </span>
                     )}
                   </span>
-                  <span className="shrink-0 font-semibold text-slate-600">
+                  <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-forest">
                     {ing.rawG}g
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               Chưa có danh sách nguyên liệu chi tiết cho suất ăn này.
             </p>
           )}
 
           {allAllergens.length > 0 ? (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-              <p className="font-bold">⚠️ Cảnh báo chất gây dị ứng:</p>
-              <p className="mt-0.5 font-semibold">{allAllergens.join(", ")}</p>
+            <div className="mt-4 border-l-4 border-coral bg-coral/10 px-4 py-3 text-xs text-ink">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-coral">
+                Cảnh báo chất gây dị ứng
+              </p>
+              <p className="mt-1 font-semibold">{allAllergens.join(", ")}</p>
             </div>
           ) : (
-            <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
+            <div className="mt-4 border-l-4 border-forest bg-forest/5 px-4 py-3 text-xs font-semibold text-forest">
               ✓ Không ghi nhận chất gây dị ứng phổ biến trong công thức món này.
             </div>
           )}
         </section>
 
         {/* Nguồn gốc & mã lô */}
-        <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-black text-brand-950">
-            Nguồn gốc & mã lô (Lot)
+        <section className="py-5">
+          <h2 className="font-display text-xl font-semibold text-forest">
+            Nguồn gốc &amp; mã lô (Lot)
           </h2>
-          <dl className="mt-2.5 space-y-2 text-xs">
-            <div className="flex items-start justify-between gap-3">
-              <dt className="text-slate-500">Mã lô (Lot code):</dt>
-              <dd className="font-mono font-bold text-brand-950 text-right">
+          <dl className="mt-3 divide-y divide-rule text-xs">
+            <div className="flex items-baseline justify-between gap-3 py-2.5">
+              <dt className="font-mono uppercase tracking-[0.12em] text-muted">
+                Mã lô (Lot code)
+              </dt>
+              <dd className="text-right font-mono font-bold text-forest">
                 {portion.lotCode || "Chưa ghi nhận"}
               </dd>
             </div>
-            <div className="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
-              <dt className="shrink-0 text-slate-500">Nguồn gốc:</dt>
-              <dd className="font-semibold text-slate-800 text-right">
+            <div className="flex items-baseline justify-between gap-3 py-2.5">
+              <dt className="shrink-0 font-mono uppercase tracking-[0.12em] text-muted">
+                Nguồn gốc
+              </dt>
+              <dd className="text-right font-semibold text-ink">
                 {portion.sourceNote || "Chưa ghi nhận"}
               </dd>
             </div>
           </dl>
         </section>
 
-        <footer className="mt-5 text-center text-[11px] leading-relaxed text-slate-500">
-          Dữ liệu được khóa cố định tại thời điểm đóng gói (mã suất{" "}
-          <span className="font-mono font-semibold text-slate-700">
-            {portion.qrCode}
-          </span>
-          ) · Mở Hộp Là Nhà
+        <footer className="border-t-2 border-forest pt-4 text-center font-mono text-xs leading-relaxed text-muted">
+          Dữ liệu được khóa cố định tại thời điểm đóng gói · Mã suất{" "}
+          <span className="font-bold text-forest">{portion.qrCode}</span>{" "}
+          · Mở Hộp Là Nhà
         </footer>
       </article>
     </main>

@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,13 +23,14 @@ export default function CartPage() {
 
   if (!mounted) {
     return (
-      <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
-        <p className="text-center text-sm text-slate-500">Đang tải giỏ hàng…</p>
+      <main className="mx-auto min-h-screen max-w-6xl px-4 py-16 sm:px-6 lg:px-10">
+        <p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+          Đang tải giỏ hàng…
+        </p>
       </main>
     );
   }
 
-  // Tính toán tài chính & dinh dưỡng
   const subtotal = lines.reduce((sum, line) => {
     const totalGrams = line.gramsPerPerson * people;
     const itemPrice = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
@@ -43,7 +45,7 @@ export default function CartPage() {
         kcal: total.kcal + macro.kcal,
         protein: total.protein + macro.protein,
         carbs: total.carbs + macro.carbs,
-        fat: total.fat + macro.fat
+        fat: total.fat + macro.fat,
       };
     },
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
@@ -54,23 +56,27 @@ export default function CartPage() {
 
   if (lines.length === 0) {
     return (
-      <main className="mx-auto min-h-screen max-w-lg px-4 py-12">
-        <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
-          <div className="text-5xl">🍱</div>
-          <h1 className="mt-4 text-2xl font-black text-brand-950">Giỏ hàng đang trống</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Bạn chưa chọn món nào cho bữa ăn. Hãy chọn số người hoặc ghé xem thực đơn hôm nay nhé!
+      <main className="mx-auto min-h-screen max-w-2xl px-4 py-16 sm:px-6">
+        <div className="border border-rule bg-white p-8 text-center shadow-sm sm:p-12">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+            Khay cơm đang trống
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <h1 className="mt-3 font-display text-3xl font-semibold text-forest sm:text-4xl">
+            Chưa có món nào trong giỏ
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Bạn chưa chọn món nào cho bữa ăn. Hãy chọn số người hoặc ghé xem thực đơn nấu mới hôm nay nhé.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
               href="/menu"
-              className="rounded-full bg-orange-500 px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-orange-600"
+              className="bg-coral px-6 py-3.5 font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:bg-coral-hover hover:shadow-md"
             >
               Xem thực đơn hôm nay
             </Link>
             <Link
               href="/"
-              className="rounded-full bg-brand-50 px-5 py-3.5 text-sm font-bold text-brand-800 transition hover:bg-brand-100"
+              className="border-2 border-forest bg-transparent px-6 py-3.5 font-mono text-xs font-bold uppercase tracking-[0.16em] text-forest transition-colors hover:bg-forest hover:text-white"
             >
               Chọn lại số người
             </Link>
@@ -81,192 +87,217 @@ export default function CartPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-lg px-4 pb-16 pt-6">
-      <div className="flex items-center justify-between">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 pb-20 pt-8 sm:px-6 lg:px-10">
+      <header className="flex flex-col justify-between gap-4 border-b-2 border-forest pb-5 sm:flex-row sm:items-end">
         <div>
-          <h1 className="text-2xl font-black text-brand-950">Giỏ hàng của bạn</h1>
-          <p className="text-xs text-slate-500">Phục vụ cho {people} người ăn</p>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+            Khẩu phần định lượng · {people} người ăn
+          </p>
+          <h1 className="mt-1 font-display text-4xl font-semibold tracking-[-0.02em] text-forest">
+            Giỏ hàng của bạn
+          </h1>
         </div>
         <Link
           href="/menu"
-          className="text-xs font-bold text-brand-700 underline hover:text-brand-800"
+          className="border-b-2 border-forest pb-0.5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest transition-colors hover:border-coral hover:text-coral"
         >
-          + Thêm món khác
+          + Thêm món khác vào giỏ
         </Link>
-      </div>
+      </header>
 
-      {/* Danh sách món trong giỏ hàng */}
-      <section className="mt-5 space-y-3">
-        {lines.map((line) => {
-          const totalGrams = line.gramsPerPerson * people;
-          const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
-          const price = Math.round((line.dish.price_vnd / line.dish.yield_g) * totalGrams);
+      <div className="mt-8 grid gap-10 lg:grid-cols-12 lg:items-start">
+        {/* Cột trái: Danh sách món ngăn cách bởi hairline */}
+        <section className="divide-y divide-rule border-b border-rule lg:col-span-7">
+          {lines.map((line) => {
+            const totalGrams = line.gramsPerPerson * people;
+            const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
+            const price = Math.round(
+              (line.dish.price_vnd / line.dish.yield_g) * totalGrams
+            );
 
-          const canDecrease = line.gramsPerPerson > line.dish.min_g;
-          const canIncrease = line.gramsPerPerson < line.dish.max_g;
+            const canDecrease = line.gramsPerPerson > line.dish.min_g;
+            const canIncrease = line.gramsPerPerson < line.dish.max_g;
 
-          return (
-            <article
-              key={line.dish.id}
-              className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-brand-50 text-2xl">
-                    {line.dish.image_url ? (
-                      line.dish.image_url.startsWith("http") || line.dish.image_url.startsWith("/") ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={line.dish.image_url}
-                            alt={line.dish.name}
-                            className="h-full w-full rounded-xl object-cover"
-                          />
-                        </>
+            return (
+              <article key={line.dish.id} className="py-6 first:pt-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white sm:h-20 sm:w-20 shadow-sm">
+                      {line.dish.image_url ? (
+                        line.dish.image_url.startsWith("http") ||
+                        line.dish.image_url.startsWith("/") ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={line.dish.image_url}
+                              alt={line.dish.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </>
+                        ) : (
+                          <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
+                        )
                       ) : (
-                        line.dish.image_url
-                      )
-                    ) : (
-                      "🍱"
-                    )}
+                        <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h2 className="font-display text-xl font-semibold text-ink">
+                        {line.dish.name}
+                      </h2>
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        <strong className="text-forest font-semibold">{line.gramsPerPerson}g/người</strong> ·{" "}
+                        <span className="text-ink font-semibold">{totalGrams}g</span> cả bữa
+                      </p>
+                      <p className="mt-1.5 font-mono text-base font-bold tabular-nums text-coral">
+                        {formatVnd(price)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold text-brand-950">{line.dish.name}</h2>
-                    <p className="text-xs text-slate-500">
-                      {line.gramsPerPerson}g/người · <strong>{totalGrams}g</strong> cả bữa
-                    </p>
-                    <p className="mt-1 text-sm font-black text-brand-700">
-                      {formatVnd(price)}
-                    </p>
-                  </div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={() => removeDish(line.dish.id)}
-                  className="rounded-lg p-1.5 text-xs font-semibold text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                  title="Xóa món"
-                  aria-label={`Xóa món ${line.dish.name}`}
-                >
-                  Xóa
-                </button>
-              </div>
-
-              {/* Dinh dưỡng của món */}
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                <span className="rounded bg-slate-100 px-2 py-0.5 font-medium">
-                  {Math.round(nutrition.kcal)} kcal
-                </span>
-                <span className="rounded bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                  Protein {nutrition.protein.toFixed(1)}g
-                </span>
-                <span className="rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                  Carbs {nutrition.carbs.toFixed(1)}g
-                </span>
-                <span className="rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
-                  Fat {nutrition.fat.toFixed(1)}g
-                </span>
-              </div>
-
-              {/* Điều chỉnh gram */}
-              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-                <span className="text-xs font-medium text-slate-500">
-                  Định lượng (bước {line.dish.step_g}g)
-                </span>
-                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() =>
-                      changeGrams(line.dish.id, line.gramsPerPerson - line.dish.step_g)
-                    }
-                    disabled={!canDecrease}
-                    className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white text-base font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                    aria-label={`Giảm định lượng ${line.dish.name}`}
+                    onClick={() => removeDish(line.dish.id)}
+                    className="border-b border-transparent font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted transition-colors hover:border-red-700 hover:text-red-700"
+                    title="Xóa món"
+                    aria-label={`Xóa món ${line.dish.name}`}
                   >
-                    −
-                  </button>
-                  <span className="min-w-16 text-center text-xs font-bold text-slate-800">
-                    {line.gramsPerPerson}g/người
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      changeGrams(line.dish.id, line.gramsPerPerson + line.dish.step_g)
-                    }
-                    disabled={!canIncrease}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-brand-700 text-base font-bold text-white transition hover:bg-brand-800 disabled:opacity-30"
-                    aria-label={`Tăng định lượng ${line.dish.name}`}
-                  >
-                    +
+                    Xóa món
                   </button>
                 </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                  {/* Bảng macro dạng inline monospace */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-muted">
+                    <span>{Math.round(nutrition.kcal)} kcal</span>
+                    <span className="text-forest font-semibold">P {nutrition.protein.toFixed(1)}g</span>
+                    <span>C {nutrition.carbs.toFixed(1)}g</span>
+                    <span>F {nutrition.fat.toFixed(1)}g</span>
+                  </div>
+
+                  {/* Bộ tăng giảm gram kiểu editorial */}
+                  <div className="flex items-center border border-forest/30 bg-white shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        changeGrams(
+                          line.dish.id,
+                          line.gramsPerPerson - line.dish.step_g
+                        )
+                      }
+                      disabled={!canDecrease}
+                      className="grid h-10 w-10 place-items-center font-mono text-lg font-bold text-forest transition-colors hover:bg-forest hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-forest"
+                      aria-label={`Giảm định lượng ${line.dish.name}`}
+                    >
+                      −
+                    </button>
+                    <span className="min-w-28 px-3 text-center font-mono text-xs font-bold tabular-nums text-ink">
+                      {line.gramsPerPerson}g / người
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        changeGrams(
+                          line.dish.id,
+                          line.gramsPerPerson + line.dish.step_g
+                        )
+                      }
+                      disabled={!canIncrease}
+                      className="grid h-10 w-10 place-items-center font-mono text-lg font-bold text-forest transition-colors hover:bg-forest hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-forest"
+                      aria-label={`Tăng định lượng ${line.dish.name}`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {/* Cột phải: Bảng tóm tắt dinh dưỡng & hóa đơn */}
+        <aside className="space-y-6 lg:sticky lg:top-24 lg:col-span-5">
+          {/* Dinh dưỡng cả bữa */}
+          <section className="border border-rule bg-white p-5 shadow-sm">
+            <h3 className="border-b border-rule pb-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-forest">
+              Tổng dinh dưỡng cả bữa ({people} người · ước tính)
+            </h3>
+            <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2">
+              <div>
+                <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Calories
+                </dt>
+                <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
+                  {Math.round(totalNutrition.kcal)} kcal
+                </dd>
               </div>
-            </article>
-          );
-        })}
-      </section>
+              <div>
+                <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Protein
+                </dt>
+                <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-forest">
+                  {totalNutrition.protein.toFixed(1)}g
+                </dd>
+              </div>
+              <div>
+                <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Carbs
+                </dt>
+                <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
+                  {totalNutrition.carbs.toFixed(1)}g
+                </dd>
+              </div>
+              <div>
+                <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                  Fat
+                </dt>
+                <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-coral">
+                  {totalNutrition.fat.toFixed(1)}g
+                </dd>
+              </div>
+            </dl>
+          </section>
 
-      {/* Tóm tắt dinh dưỡng cả bữa */}
-      <section className="mt-5 rounded-2xl bg-brand-50 p-4 text-brand-950">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-brand-700">
-          Tổng dinh dưỡng cả bữa ({people} người)
-        </h3>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
-          <div className="rounded-xl bg-white p-2 shadow-xs">
-            <span className="block text-xs text-slate-500">Calories</span>
-            <strong className="text-sm font-black text-brand-950">
-              {Math.round(totalNutrition.kcal)}
-            </strong>
-          </div>
-          <div className="rounded-xl bg-white p-2 shadow-xs">
-            <span className="block text-xs text-slate-500">Protein</span>
-            <strong className="text-sm font-black text-emerald-700">
-              {totalNutrition.protein.toFixed(1)}g
-            </strong>
-          </div>
-          <div className="rounded-xl bg-white p-2 shadow-xs">
-            <span className="block text-xs text-slate-500">Carbs</span>
-            <strong className="text-sm font-black text-amber-800">
-              {totalNutrition.carbs.toFixed(1)}g
-            </strong>
-          </div>
-          <div className="rounded-xl bg-white p-2 shadow-xs">
-            <span className="block text-xs text-slate-500">Fat</span>
-            <strong className="text-sm font-black text-blue-700">
-              {totalNutrition.fat.toFixed(1)}g
-            </strong>
-          </div>
-        </div>
-      </section>
+          {/* Hóa đơn thanh toán Deep Forest Green */}
+          <section className="bg-forest p-6 text-white shadow-sm">
+            <h3 className="border-b border-white/20 pb-3 font-display text-xl font-semibold text-white">
+              Tóm tắt thanh toán
+            </h3>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex justify-between text-ivory/80">
+                <span>Tạm tính món ăn</span>
+                <span className="font-mono font-bold tabular-nums text-white">
+                  {formatVnd(Math.round(subtotal))}
+                </span>
+              </div>
+              <div className="flex justify-between text-ivory/80">
+                <span>Phí giao hàng (nội thành)</span>
+                <span className="font-mono font-bold tabular-nums text-white">
+                  {formatVnd(shippingFee)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between border-t border-white/20 pt-4">
+                <span className="font-display text-lg font-semibold text-white">
+                  Tổng thanh toán
+                </span>
+                <span className="font-display text-3xl font-bold text-coral">
+                  {formatVnd(Math.round(finalTotal))}
+                </span>
+              </div>
+            </div>
 
-      {/* Chi tiết thanh toán: Tạm tính, Phí ship, Tổng */}
-      <section className="mt-5 space-y-2.5 rounded-2xl bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-brand-950">Tóm tắt thanh toán</h3>
-        <div className="flex justify-between text-sm text-slate-600">
-          <span>Tạm tính món ăn</span>
-          <span className="font-semibold">{formatVnd(Math.round(subtotal))}</span>
-        </div>
-        <div className="flex justify-between text-sm text-slate-600">
-          <span>Phí giao hàng (nội thành)</span>
-          <span className="font-semibold">{formatVnd(shippingFee)}</span>
-        </div>
-        <div className="border-t border-slate-100 pt-3 flex justify-between text-base font-black text-brand-950">
-          <span>Tổng thanh toán</span>
-          <span className="text-xl text-orange-600">{formatVnd(Math.round(finalTotal))}</span>
-        </div>
-      </section>
-
-      {/* Nút tiến hành đặt hàng */}
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={() => router.push("/checkout")}
-          className="w-full rounded-full bg-orange-500 py-4 text-center font-black text-white shadow-lg transition hover:bg-orange-600"
-        >
-          Tiến hành đặt hàng · {formatVnd(Math.round(finalTotal))}
-        </button>
+            <button
+              type="button"
+              onClick={() => router.push("/checkout")}
+              className="mt-6 flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2"
+            >
+              <span>Tiến hành đặt hàng · {formatVnd(Math.round(finalTotal))}</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </section>
+        </aside>
       </div>
     </main>
   );
 }
-

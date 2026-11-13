@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,7 +29,6 @@ export default function CheckoutPage() {
     setMounted(true);
   }, []);
 
-  // Tính toán tài chính
   const subtotal = useMemo(() => {
     return lines.reduce((sum, line) => {
       const totalGrams = line.gramsPerPerson * people;
@@ -40,7 +40,6 @@ export default function CheckoutPage() {
   const shippingFee = lines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
   const total = subtotal + shippingFee;
 
-  // Kiểm tra địa chỉ thuộc vùng phục vụ
   const addressValidation = useMemo(() => {
     return validateServiceArea(address);
   }, [address]);
@@ -73,14 +72,14 @@ export default function CheckoutPage() {
         note: note.trim() || undefined,
         lines: lines.map((line) => ({
           dishId: line.dish.id,
-          grams: line.gramsPerPerson * people
-        }))
+          grams: line.gramsPerPerson * people,
+        })),
       };
 
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -88,7 +87,6 @@ export default function CheckoutPage() {
         throw new Error(data.error ?? "Không thể tạo đơn hàng. Vui lòng thử lại.");
       }
 
-      // Xóa giỏ hàng và chuyển hướng sang trang thanh toán /payment/[orderId]
       clearCart();
       router.push(`/payment/${data.orderId}`);
     } catch (err) {
@@ -99,24 +97,30 @@ export default function CheckoutPage() {
 
   if (!mounted) {
     return (
-      <main className="mx-auto min-h-screen max-w-lg px-4 py-8">
-        <p className="text-center text-sm text-slate-500">Đang chuẩn bị trang thanh toán…</p>
+      <main className="mx-auto min-h-screen max-w-6xl px-4 py-16 sm:px-6 lg:px-10">
+        <p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+          Đang chuẩn bị trang thanh toán…
+        </p>
       </main>
     );
   }
 
   if (lines.length === 0) {
     return (
-      <main className="mx-auto min-h-screen max-w-lg px-4 py-12">
-        <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
-          <div className="text-4xl">🛒</div>
-          <h1 className="mt-3 text-xl font-bold text-brand-950">Giỏ hàng đang trống</h1>
-          <p className="mt-2 text-sm text-slate-600">
+      <main className="mx-auto min-h-screen max-w-2xl px-4 py-16 sm:px-6">
+        <div className="border border-rule bg-white p-8 text-center shadow-sm sm:p-12">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+            Khay cơm đang trống
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-semibold text-forest">
+            Giỏ hàng đang trống
+          </h1>
+          <p className="mt-2 text-sm text-muted">
             Vui lòng chọn món trước khi tiến hành thanh toán.
           </p>
           <Link
             href="/menu"
-            className="mt-5 inline-block rounded-full bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-orange-600"
+            className="mt-6 inline-block bg-coral px-6 py-3.5 font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-sm transition-all hover:bg-coral-hover hover:shadow-md"
           >
             Quay lại thực đơn
           </Link>
@@ -126,23 +130,39 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-lg px-4 pb-16 pt-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-black text-brand-950">Thông tin giao hàng</h1>
-        <Link href="/cart" className="text-xs font-bold text-brand-700 underline">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 pb-20 pt-8 sm:px-6 lg:px-10">
+      <header className="flex flex-col justify-between gap-4 border-b-2 border-forest pb-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+            Bước cuối cùng · Nhận mã VietQR chuẩn Napas 247
+          </p>
+          <h1 className="mt-1 font-display text-4xl font-semibold tracking-[-0.02em] text-forest">
+            Thông tin giao hàng
+          </h1>
+        </div>
+        <Link
+          href="/cart"
+          className="border-b-2 border-forest pb-0.5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest transition-colors hover:border-coral hover:text-coral"
+        >
           ← Sửa giỏ hàng
         </Link>
-      </div>
+      </header>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-        {/* Thông tin khách hàng */}
-        <section className="space-y-4 rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-base font-bold text-brand-950">Người nhận cơm</h2>
+      <form
+        onSubmit={handleSubmit}
+        className="mt-8 grid gap-10 lg:grid-cols-12 lg:items-start"
+      >
+        {/* Cột trái: Form thông tin người nhận */}
+        <section className="space-y-6 border border-rule bg-white p-6 shadow-sm sm:p-8 lg:col-span-7">
+          <div className="border-b border-rule pb-3">
+            <h2 className="font-display text-2xl font-semibold text-forest">
+              Người nhận cơm
+            </h2>
+          </div>
 
-          {/* Họ và tên */}
           <div>
-            <label className="block text-xs font-bold text-slate-700">
-              Họ và tên <span className="text-red-500">*</span>
+            <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
+              Họ và tên <span className="text-coral">*</span>
             </label>
             <input
               type="text"
@@ -150,14 +170,13 @@ export default function CheckoutPage() {
               placeholder="Ví dụ: Nguyễn Văn An"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              className="mt-2 w-full border border-rule bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-forest focus:bg-white"
             />
           </div>
 
-          {/* Số điện thoại */}
           <div>
-            <label className="block text-xs font-bold text-slate-700">
-              Số điện thoại <span className="text-red-500">*</span>
+            <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
+              Số điện thoại <span className="text-coral">*</span>
             </label>
             <input
               type="tel"
@@ -165,38 +184,41 @@ export default function CheckoutPage() {
               placeholder="Ví dụ: 0912345678"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className={`mt-1.5 w-full rounded-xl border px-3.5 py-3 text-sm outline-none transition focus:ring-2 ${
+              className={`mt-2 w-full border bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:bg-white ${
                 phone && !isPhoneValid
-                  ? "border-red-300 focus:border-red-500 focus:ring-red-100"
-                  : "border-slate-200 focus:border-brand-600 focus:ring-brand-100"
+                  ? "border-red-600 focus:border-red-700"
+                  : "border-rule focus:border-forest"
               }`}
             />
             {phone && !isPhoneValid && (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-1.5 text-xs font-medium text-red-600">
                 Vui lòng nhập số điện thoại Việt Nam hợp lệ (10 chữ số, bắt đầu bằng 0).
               </p>
             )}
           </div>
 
-          {/* Email (không bắt buộc) */}
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">Email</label>
-              <span className="text-[11px] text-slate-400">Không bắt buộc</span>
+              <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
+                Email
+              </label>
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
+                Không bắt buộc
+              </span>
             </div>
             <input
               type="email"
               placeholder="Để nhận thông báo xác nhận đơn hàng"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              className="mt-2 w-full border border-rule bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-forest focus:bg-white"
             />
           </div>
 
-          {/* Địa chỉ nhận hàng */}
           <div>
-            <label className="block text-xs font-bold text-slate-700">
-              Địa chỉ nhận hàng (kèm Quận/Huyện) <span className="text-red-500">*</span>
+            <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
+              Địa chỉ nhận hàng (kèm Quận/Huyện){" "}
+              <span className="text-coral">*</span>
             </label>
             <textarea
               required
@@ -207,131 +229,153 @@ export default function CheckoutPage() {
                 setAddress(e.target.value);
                 setTouchedAddress(true);
               }}
-              className={`mt-1.5 w-full rounded-xl border px-3.5 py-3 text-sm outline-none transition focus:ring-2 ${
+              className={`mt-2 w-full border bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:bg-white ${
                 touchedAddress && address && !addressValidation.inService
-                  ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-100"
+                  ? "border-red-600 focus:border-red-700"
                   : addressValidation.inService
-                  ? "border-emerald-400 bg-emerald-50/20 focus:border-emerald-600 focus:ring-emerald-100"
-                  : "border-slate-200 focus:border-brand-600 focus:ring-brand-100"
+                    ? "border-forest focus:border-forest"
+                    : "border-rule focus:border-forest"
               }`}
             />
 
-            {/* Thông báo kiểm tra vùng phục vụ */}
             {address.trim().length > 0 && (
-              <div className="mt-2">
+              <div className="mt-2.5">
                 {addressValidation.inService ? (
-                  <p className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
-                    <span>✓</span> Địa chỉ thuộc vùng giao hàng: {addressValidation.matchedDistrict}
+                  <p className="border-l-4 border-forest bg-forest/5 px-3 py-2 text-xs font-semibold text-forest">
+                    ✓ Địa chỉ thuộc vùng giao hàng: {addressValidation.matchedDistrict}
                   </p>
                 ) : (
                   <div
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+                    className="border-l-4 border-red-600 bg-red-50/60 px-3.5 py-2.5 text-xs text-red-800"
                   >
-                    <p className="font-bold">⚠️ Không thể giao hàng đến địa chỉ này</p>
+                    <p className="font-bold">Không thể giao hàng đến địa chỉ này</p>
                     <p className="mt-1">{addressValidation.message}</p>
                   </div>
                 )}
               </div>
             )}
             {!address && (
-              <p className="mt-1 text-[11px] text-slate-500">
-                Vùng hỗ trợ:{" "}
-                {DELIVERY_CONFIG.serviceDistricts.map((d) => d.district).join(", ")}.
+              <p className="mt-1.5 text-[11px] text-muted">
+                Vùng hỗ trợ giao hàng:{" "}
+                {DELIVERY_CONFIG.serviceDistricts
+                  .map((d) => d.district)
+                  .join(", ")}
+                .
               </p>
             )}
           </div>
 
-          {/* Ghi chú */}
           <div>
-            <label className="block text-xs font-bold text-slate-700">
+            <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
               Ghi chú cho bếp hoặc shipper (không bắt buộc)
             </label>
             <input
               type="text"
-              placeholder="Ví dụ: Để ở bàn bảo vệ, không cay..."
+              placeholder="Ví dụ: Để ở bàn lễ tân, canh ít cay..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              className="mt-2 w-full border border-rule bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:border-forest focus:bg-white"
             />
           </div>
         </section>
 
-        {/* Tóm tắt đơn hàng */}
-        <section className="space-y-3 rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-base font-bold text-brand-950">Món đã chọn ({lines.length} món)</h2>
-          <div className="divide-y divide-slate-100">
-            {lines.map((line) => {
-              const itemGrams = line.gramsPerPerson * people;
-              const itemPrice = Math.round((line.dish.price_vnd / line.dish.yield_g) * itemGrams);
-              return (
-                <div key={line.dish.id} className="flex justify-between py-2 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-800">{line.dish.name}</span>
-                    <span className="ml-2 text-slate-500">({itemGrams}g)</span>
+        {/* Cột phải: Sticky Tóm tắt đơn & Nút đặt hàng Deep Forest Green */}
+        <aside className="space-y-5 lg:sticky lg:top-24 lg:col-span-5">
+          <section className="bg-forest p-6 text-white shadow-sm">
+            <h2 className="border-b border-white/20 pb-3 font-display text-xl font-semibold text-white">
+              Món đã chọn ({lines.length} món)
+            </h2>
+
+            <div className="divide-y divide-white/10">
+              {lines.map((line) => {
+                const itemGrams = line.gramsPerPerson * people;
+                const itemPrice = Math.round(
+                  (line.dish.price_vnd / line.dish.yield_g) * itemGrams
+                );
+                return (
+                  <div
+                    key={line.dish.id}
+                    className="flex items-baseline justify-between gap-3 py-3 text-xs"
+                  >
+                    <div>
+                      <span className="font-medium text-white">
+                        {line.dish.name}
+                      </span>
+                      <span className="ml-2 font-mono text-ivory/70">
+                        ({itemGrams}g)
+                      </span>
+                    </div>
+                    <span className="shrink-0 font-mono font-bold tabular-nums text-ivory">
+                      {formatVnd(itemPrice)}
+                    </span>
                   </div>
-                  <span className="font-bold text-brand-700">{formatVnd(itemPrice)}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="border-t border-slate-100 pt-3 space-y-2 text-sm text-slate-600">
-            <div className="flex justify-between">
-              <span>Tạm tính ({people} người)</span>
-              <span className="font-semibold">{formatVnd(Math.round(subtotal))}</span>
+                );
+              })}
             </div>
-            <div className="flex justify-between">
-              <span>Phí vận chuyển (từ config)</span>
-              <span className="font-semibold">{formatVnd(shippingFee)}</span>
-            </div>
-            <div className="flex justify-between border-t border-slate-100 pt-2 text-base font-black text-brand-950">
-              <span>Tổng thanh toán</span>
-              <span className="text-xl text-orange-600">{formatVnd(Math.round(total))}</span>
-            </div>
-          </div>
-        </section>
 
-        {/* Hiển thị lỗi nếu có */}
-        {error && (
-          <div
-            role="alert"
-            className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700"
-          >
-            <p className="font-bold">⚠️ Không thể đặt đơn</p>
-            <p className="mt-1">{error}</p>
-            <Link
-              href="/menu"
-              className="mt-2 inline-block font-bold text-red-800 underline"
-            >
-              ← Quay lại thực đơn để điều chỉnh món
-            </Link>
-          </div>
-        )}
+            <div className="mt-2 space-y-2.5 border-t border-white/15 pt-4 text-sm text-ivory/80">
+              <div className="flex justify-between">
+                <span>Tạm tính ({people} người)</span>
+                <span className="font-mono font-bold tabular-nums text-white">
+                  {formatVnd(Math.round(subtotal))}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Phí vận chuyển (nội thành)</span>
+                <span className="font-mono font-bold tabular-nums text-white">
+                  {formatVnd(shippingFee)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between border-t border-white/20 pt-3">
+                <span className="font-display text-lg font-semibold text-white">
+                  Tổng thanh toán
+                </span>
+                <span className="font-display text-3xl font-bold text-coral">
+                  {formatVnd(Math.round(total))}
+                </span>
+              </div>
+            </div>
 
-        {/* Nút đặt hàng: CHẶN nếu ngoài vùng phục vụ hoặc thiếu thông tin */}
-        <div>
-          <button
-            type="submit"
-            disabled={!isFormValid || submitting}
-            className="w-full rounded-full bg-orange-500 py-4 font-black text-white shadow-lg transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-          >
-            {submitting ? (
-              "Đang khởi tạo đơn hàng…"
-            ) : !addressValidation.inService && address.length > 0 ? (
-              "Địa chỉ ngoài vùng phục vụ — Không thể đặt"
-            ) : (
-              `Đặt cơm & Nhận mã VietQR · ${formatVnd(Math.round(total))}`
+            {error && (
+              <div
+                role="alert"
+                className="mt-4 border-l-4 border-coral bg-white p-3.5 text-xs font-medium text-ink"
+              >
+                <p className="font-bold text-red-600">Không thể đặt đơn</p>
+                <p className="mt-1">{error}</p>
+                <Link
+                  href="/menu"
+                  className="mt-2 inline-block font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-forest underline hover:text-coral"
+                >
+                  ← Quay lại thực đơn để điều chỉnh món
+                </Link>
+              </div>
             )}
-          </button>
-          {!addressValidation.inService && address.length > 0 && (
-            <p className="mt-2 text-center text-xs text-red-600">
-              Vui lòng đổi địa chỉ nhận hàng thuộc vùng phục vụ để tiếp tục.
-            </p>
-          )}
-        </div>
+
+            <button
+              type="submit"
+              disabled={!isFormValid || submitting}
+              className="mt-6 flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span>
+                {submitting
+                  ? "Đang khởi tạo đơn hàng…"
+                  : !addressValidation.inService && address.length > 0
+                    ? "Địa chỉ ngoài vùng — Không thể đặt"
+                    : `Đặt cơm & Nhận mã VietQR · ${formatVnd(Math.round(total))}`}
+              </span>
+              {!submitting && isFormValid && <span aria-hidden="true">→</span>}
+            </button>
+
+            {!addressValidation.inService && address.length > 0 && (
+              <p className="mt-2 text-center text-xs text-coral">
+                Vui lòng đổi địa chỉ nhận hàng thuộc vùng phục vụ để tiếp tục.
+              </p>
+            )}
+          </section>
+        </aside>
       </form>
     </main>
   );
 }
-

@@ -6,7 +6,7 @@ import { PaymentView } from "@/components/payment-view";
 export const dynamic = "force-dynamic";
 
 export default async function PaymentPage({
-  params
+  params,
 }: {
   params: Promise<{ orderId: string }>;
 }) {
@@ -22,7 +22,7 @@ export default async function PaymentPage({
   const qrSvgUrl = `/api/qr?data=${encodeURIComponent(vietQrPayload)}`;
 
   return (
-    <main className="mx-auto min-h-screen max-w-lg px-4 pb-16 pt-6">
+    <main className="mx-auto min-h-screen max-w-5xl px-4 pb-20 pt-8 sm:px-6 lg:px-10">
       <PaymentView
         order={order}
         vietQrImageUrl={vietQrImageUrl}
@@ -31,4 +31,3 @@ export default async function PaymentPage({
     </main>
   );
 }
-

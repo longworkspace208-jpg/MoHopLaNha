@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OrderRecord } from "@/lib/types";
@@ -8,7 +9,7 @@ import { BANK_CONFIG } from "@/lib/bank-config";
 export function PaymentView({
   order,
   vietQrImageUrl,
-  qrSvgUrl
+  qrSvgUrl,
 }: {
   order: OrderRecord;
   vietQrImageUrl: string;
@@ -22,7 +23,7 @@ export function PaymentView({
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopyFeedback(`Đã sao chép ${label}!`);
+      setCopyFeedback(`Đã sao chép ${label}.`);
       setTimeout(() => setCopyFeedback(""), 2500);
     } catch {
       setCopyFeedback("Không thể tự động sao chép.");
@@ -37,7 +38,6 @@ export function PaymentView({
 
   const handleDownloadQr = async () => {
     try {
-      // Tải qua ảnh SVG hoặc VietQR URL
       const res = await fetch(qrSvgUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -59,7 +59,7 @@ export function PaymentView({
 
     try {
       const res = await fetch(`/api/orders/${order.id}/confirm-transfer`, {
-        method: "POST"
+        method: "POST",
       });
       const data = await res.json();
 
@@ -67,7 +67,6 @@ export function PaymentView({
         throw new Error(data.error ?? "Không thể cập nhật trạng thái đơn hàng.");
       }
 
-      // Chuyển hướng sang trang theo dõi đơn hàng /orders/[code]
       router.push(`/orders/${order.public_code}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra.");
@@ -76,192 +75,232 @@ export function PaymentView({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Thẻ QR Code */}
-      <section className="rounded-3xl border border-amber-100 bg-white p-6 text-center shadow-md">
-        <p className="text-xs font-bold uppercase tracking-widest text-orange-600">
-          Mở Hộp Là Nhà · Thanh toán VietQR
-        </p>
-        <h1 className="mt-2 text-2xl font-black text-brand-950">Mã QR Thanh Toán</h1>
-        <p className="mt-1 text-xs text-slate-500">
-          Quét mã bằng bất kỳ ứng dụng ngân hàng nào hỗ trợ VietQR / Napas 247
-        </p>
-
-        {/* Khung ảnh QR */}
-        <div className="relative mx-auto mt-5 w-64 max-w-full rounded-2xl border-2 border-dashed border-brand-200 bg-white p-3 shadow-inner">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrSvgUrl}
-            alt={`Mã VietQR đơn hàng ${order.public_code}`}
-            className="mx-auto h-56 w-56 max-w-full rounded-xl object-contain"
-            onError={(e) => {
-              // Fallback nếu SVG bị lỗi
-              (e.target as HTMLImageElement).src = vietQrImageUrl;
-            }}
-          />
-        </div>
-
-        {/* Số tiền nổi bật */}
-        <div className="mt-4">
-          <span className="text-xs font-semibold text-slate-500">Số tiền cần thanh toán</span>
-          <p className="text-3xl font-black text-brand-700">{formatVnd(order.total_vnd)}</p>
-        </div>
-
-        {/* Hai nút hành động nhanh: Lưu QR & Sao chép tất cả */}
-        <div className="mt-5 flex gap-2.5">
-          <button
-            type="button"
-            onClick={handleDownloadQr}
-            className="flex-1 rounded-xl border border-brand-300 bg-brand-50/60 py-3 text-xs font-bold text-brand-800 transition hover:bg-brand-100"
-          >
-            📥 Lưu mã QR
-          </button>
-          <button
-            type="button"
-            onClick={copyAllInfo}
-            className="flex-1 rounded-xl border border-brand-300 bg-brand-50/60 py-3 text-xs font-bold text-brand-800 transition hover:bg-brand-100"
-          >
-            📋 Sao chép thông tin
-          </button>
-        </div>
-
-        {copyFeedback && (
-          <p className="mt-3 rounded-lg bg-emerald-50 py-1.5 text-xs font-semibold text-emerald-700 animate-fade-in">
-            ✓ {copyFeedback}
+    <div className="space-y-8">
+      <header className="flex flex-col justify-between gap-3 border-b-2 border-forest pb-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
+            Mở Hộp Là Nhà · Cổng thanh toán chuyển khoản VietQR
           </p>
-        )}
-      </section>
+          <h1 className="mt-1 font-display text-4xl font-semibold tracking-[-0.02em] text-forest">
+            Mã QR Thanh Toán
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+            Mã đơn:
+          </span>
+          <span className="bg-forest px-3 py-1 font-mono text-xs font-bold text-white shadow-sm">
+            #{order.public_code}
+          </span>
+        </div>
+      </header>
 
-      {/* Chi tiết tài khoản ngân hàng */}
-      <section className="space-y-3 rounded-3xl bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-          Thông tin chuyển khoản thủ công
-        </h2>
+      <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
+        {/* Cột trái: Khung mã QR chuẩn biên tập */}
+        <section className="border border-rule bg-white p-6 text-center shadow-sm sm:p-8 lg:col-span-5">
+          <p className="text-xs leading-relaxed text-muted">
+            Quét mã bằng bất kỳ ứng dụng ngân hàng hoặc ví điện tử hỗ trợ VietQR / Napas 247.
+          </p>
 
-        <div className="space-y-2.5 text-sm">
-          {/* Ngân hàng */}
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
-            <div>
-              <span className="block text-[11px] text-slate-500">Ngân hàng thụ hưởng</span>
-              <span className="font-bold text-slate-800">{BANK_CONFIG.bankName}</span>
-            </div>
+          <div className="mx-auto mt-6 w-64 max-w-full border-2 border-forest bg-white p-3 shadow-inner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrSvgUrl}
+              alt={`Mã VietQR đơn hàng ${order.public_code}`}
+              className="mx-auto h-56 w-56 max-w-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = vietQrImageUrl;
+              }}
+            />
+          </div>
+
+          <div className="mt-6 border-t border-rule pt-4">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+              Số tiền cần thanh toán
+            </span>
+            <p className="mt-1 font-display text-3xl font-bold text-coral sm:text-4xl">
+              {formatVnd(order.total_vnd)}
+            </p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => copyToClipboard(BANK_CONFIG.bin, "Mã BIN")}
-              className="text-xs font-semibold text-brand-700 hover:underline"
+              onClick={handleDownloadQr}
+              className="border-2 border-forest bg-transparent py-3 font-mono text-xs font-bold uppercase tracking-[0.12em] text-forest transition-colors hover:bg-forest hover:text-white"
             >
-              Chép BIN
+              Lưu mã QR
+            </button>
+            <button
+              type="button"
+              onClick={copyAllInfo}
+              className="border-2 border-forest bg-transparent py-3 font-mono text-xs font-bold uppercase tracking-[0.12em] text-forest transition-colors hover:bg-forest hover:text-white"
+            >
+              Sao chép thông tin
             </button>
           </div>
 
-          {/* Số tài khoản */}
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
-            <div>
-              <span className="block text-[11px] text-slate-500">Số tài khoản</span>
-              <span className="font-mono text-base font-black text-brand-950">
-                {BANK_CONFIG.account}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyToClipboard(BANK_CONFIG.account, "Số tài khoản")}
-              className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-brand-700 shadow-xs border border-slate-200 hover:bg-slate-50"
-            >
-              Sao chép
-            </button>
-          </div>
+          {copyFeedback && (
+            <p className="mt-4 border-l-4 border-forest bg-forest/10 px-3 py-2 text-left font-mono text-xs font-semibold text-forest">
+              ✓ {copyFeedback}
+            </p>
+          )}
+        </section>
 
-          {/* Chủ tài khoản */}
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
-            <div>
-              <span className="block text-[11px] text-slate-500">Chủ tài khoản</span>
-              <span className="font-bold text-slate-800">{BANK_CONFIG.accountName}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => copyToClipboard(BANK_CONFIG.accountName, "Tên chủ tài khoản")}
-              className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-brand-700 shadow-xs border border-slate-200 hover:bg-slate-50"
-            >
-              Sao chép
-            </button>
-          </div>
+        {/* Cột phải: Bảng chuyển khoản thủ công & xác nhận */}
+        <div className="space-y-6 lg:col-span-7">
+          <section className="border border-rule bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="border-b border-rule pb-3 font-display text-xl font-semibold text-forest">
+              Thông tin chuyển khoản thủ công
+            </h2>
 
-          {/* Nội dung chuyển khoản (bắt buộc) */}
-          <div className="flex items-center justify-between rounded-xl border-2 border-orange-200 bg-orange-50/50 p-3">
-            <div>
-              <span className="block text-[11px] font-bold text-orange-700">
-                Nội dung chuyển khoản (chính xác)
-              </span>
-              <span className="font-mono text-lg font-black text-orange-950">
-                {order.public_code}
-              </span>
+            <dl className="mt-2 divide-y divide-rule text-sm">
+              <div className="flex items-center justify-between gap-4 py-3.5">
+                <div>
+                  <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    Ngân hàng thụ hưởng
+                  </dt>
+                  <dd className="mt-0.5 font-bold text-ink">
+                    {BANK_CONFIG.bankName}
+                  </dd>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(BANK_CONFIG.bin, "Mã BIN")}
+                  className="font-mono text-xs font-bold uppercase tracking-[0.12em] text-forest underline hover:text-coral"
+                >
+                  Chép BIN
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 py-3.5">
+                <div>
+                  <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    Số tài khoản
+                  </dt>
+                  <dd className="mt-0.5 font-mono text-base font-bold text-forest">
+                    {BANK_CONFIG.account}
+                  </dd>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToClipboard(BANK_CONFIG.account, "Số tài khoản")
+                  }
+                  className="border border-forest/30 bg-ivory/50 px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-forest transition-colors hover:bg-forest hover:text-white"
+                >
+                  Sao chép
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 py-3.5">
+                <div>
+                  <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                    Chủ tài khoản
+                  </dt>
+                  <dd className="mt-0.5 font-bold text-ink">
+                    {BANK_CONFIG.accountName}
+                  </dd>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToClipboard(BANK_CONFIG.accountName, "Tên chủ tài khoản")
+                  }
+                  className="border border-forest/30 bg-ivory/50 px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.12em] text-forest transition-colors hover:bg-forest hover:text-white"
+                >
+                  Sao chép
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 border-l-4 border-l-coral bg-coral/10 px-4 py-3.5">
+                <div>
+                  <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-coral">
+                    Nội dung chuyển khoản (chính xác)
+                  </dt>
+                  <dd className="mt-0.5 font-mono text-xl font-bold text-forest">
+                    {order.public_code}
+                  </dd>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyToClipboard(order.public_code, "Nội dung chuyển khoản")
+                  }
+                  className="bg-coral px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] text-white shadow-sm transition-colors hover:bg-coral-hover"
+                >
+                  Sao chép
+                </button>
+              </div>
+            </dl>
+          </section>
+
+          <section className="border border-rule bg-white p-6 shadow-sm">
+            <h2 className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-forest">
+              Hướng dẫn thanh toán 3 bước
+            </h2>
+            <ol className="mt-4 divide-y divide-rule text-xs leading-relaxed text-muted">
+              <li className="flex items-start gap-3 py-3 first:pt-0">
+                <span className="font-mono font-bold text-coral">01</span>
+                <span>
+                  Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ của bạn (VCB, MB, Techcombank, VPBank…).
+                </span>
+              </li>
+              <li className="flex items-start gap-3 py-3">
+                <span className="font-mono font-bold text-coral">02</span>
+                <span>
+                  Chọn <strong>Quét mã QR</strong> hoặc chuyển khoản nhanh 24/7 với đúng nội dung{" "}
+                  <strong className="font-mono text-coral font-bold">
+                    {order.public_code}
+                  </strong>
+                  .
+                </span>
+              </li>
+              <li className="flex items-start gap-3 py-3 last:pb-0">
+                <span className="font-mono font-bold text-coral">03</span>
+                <span>
+                  Kiểm tra đúng số tiền{" "}
+                  <strong className="text-forest font-bold">
+                    {formatVnd(order.total_vnd)}
+                  </strong>
+                  , hoàn tất chuyển tiền rồi nhấn nút{" "}
+                  <strong className="text-forest font-bold">&quot;Tôi đã chuyển khoản&quot;</strong> bên dưới.
+                </span>
+              </li>
+            </ol>
+          </section>
+
+          {error && (
+            <div className="border-l-4 border-coral bg-white p-4 text-xs font-medium text-red-700 shadow-sm">
+              {error}
             </div>
+          )}
+
+          {/* Nút 'Tôi đã chuyển khoản' CHỈ đặt status='pending_verification' */}
+          <div>
             <button
               type="button"
-              onClick={() => copyToClipboard(order.public_code, "Nội dung chuyển khoản")}
-              className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-orange-600"
+              onClick={handleConfirmTransfer}
+              disabled={isSubmitting}
+              className="flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.18em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 disabled:opacity-50"
             >
-              Sao chép
+              <span>
+                {isSubmitting
+                  ? "Đang ghi nhận chuyển khoản…"
+                  : "Tôi đã chuyển khoản"}
+              </span>
+              {!isSubmitting && <span aria-hidden="true">✓</span>}
             </button>
+            <p className="mt-2.5 text-center text-[11px] leading-relaxed text-muted">
+              Sau khi bạn xác nhận, đơn hàng chuyển sang trạng thái{" "}
+              <strong className="text-forest font-bold">
+                Đang đối soát (pending_verification)
+              </strong>{" "}
+              để nhân viên bếp kiểm tra và chuẩn bị cơm.
+            </p>
           </div>
         </div>
-      </section>
-
-      {/* Hướng dẫn mở app ngân hàng */}
-      <section className="space-y-3 rounded-3xl bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-bold text-brand-950">Hướng dẫn thanh toán 3 bước</h2>
-        <ol className="space-y-3 text-xs text-slate-600">
-          <li className="flex items-start gap-3">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
-              1
-            </span>
-            <span>
-              Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ của bạn (VCB, MB, Techcombank, VPBank,...)
-            </span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
-              2
-            </span>
-            <span>
-              Chọn tính năng <strong>Quét mã QR</strong> hoặc chuyển khoản nhanh 24/7 với nội dung{" "}
-              <strong className="text-orange-600">{order.public_code}</strong>.
-            </span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">
-              3
-            </span>
-            <span>
-              Kiểm tra đúng số tiền <strong>{formatVnd(order.total_vnd)}</strong>, xác thực giao dịch,
-              sau đó bấm nút <strong>&quot;Tôi đã chuyển khoản&quot;</strong> bên dưới.
-            </span>
-          </li>
-        </ol>
-      </section>
-
-      {/* Hiển thị lỗi nếu có */}
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Nút 'Tôi đã chuyển khoản' CHỈ đặt status='pending_verification' */}
-      <div className="pt-2">
-        <button
-          type="button"
-          onClick={handleConfirmTransfer}
-          disabled={isSubmitting}
-          className="w-full rounded-full bg-emerald-600 py-4 text-center font-black text-white shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {isSubmitting ? "Đang ghi nhận chuyển khoản…" : "Tôi đã chuyển khoản"}
-        </button>
-        <p className="mt-2 text-center text-[11px] text-slate-500">
-          Sau khi bạn bấm, đơn hàng sẽ chuyển sang trạng thái <strong>Chờ đối soát (pending_verification)</strong> để nhân viên quán kiểm tra và chuẩn bị cơm.
-        </p>
       </div>
     </div>
   );
 }
-

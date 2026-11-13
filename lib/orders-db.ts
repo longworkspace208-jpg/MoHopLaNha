@@ -144,6 +144,7 @@ export function resetFallbackDemoData(): void {
 
   const nowMs = Date.now();
   const todayDate = todayYmdVn();
+  const todayStartMs = new Date(`${todayDate}T00:00:00+07:00`).getTime();
 
   for (let i = 0; i < demoSeed.cookingBatches.length; i++) {
     const b = demoSeed.cookingBatches[i];
@@ -160,7 +161,11 @@ export function resetFallbackDemoData(): void {
 
   for (let idx = 0; idx < demoSeed.orders.length; idx++) {
     const spec = demoSeed.orders[idx];
-    const createdAt = new Date(nowMs - (demoSeed.orders.length - idx) * 900_000).toISOString();
+    const orderTimeMs = Math.max(
+      todayStartMs + (idx + 1) * 1000,
+      nowMs - (demoSeed.orders.length - idx) * 900_000
+    );
+    const createdAt = new Date(orderTimeMs).toISOString();
     let subtotal = 0;
     const totalNutrition: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
 

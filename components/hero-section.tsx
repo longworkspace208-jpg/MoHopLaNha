@@ -34,11 +34,23 @@ export function HeroSection({ dishes }: HeroSectionProps) {
   const addDish = useCartStore((state) => state.addDish);
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [direction, setDirection] = useState<"next" | "prev">("next");
+  const [transitionTick, setTransitionTick] = useState(0);
   const [liveMenuDishes, setLiveMenuDishes] = useState<Record<string, MenuDish>>({});
   const [orderNotice, setOrderNotice] = useState("");
   const [ordering, setOrdering] = useState(false);
 
   const active = dishes[activeIndex] ?? dishes[0];
+
+  const selectDish = (nextIndex: number, explicitDirection?: "next" | "prev") => {
+    if (dishes.length === 0) return;
+    const normalized = ((nextIndex % dishes.length) + dishes.length) % dishes.length;
+    if (normalized === activeIndex) return;
+    setDirection(explicitDirection ?? (normalized > activeIndex ? "next" : "prev"));
+    setTransitionTick((t) => t + 1);
+    setActiveIndex(normalized);
+    setOrderNotice("");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +66,7 @@ export function HeroSection({ dishes }: HeroSectionProps) {
         }
       })
       .catch(() => {
-        // Giữ fallbackMenuDish nếu offline
+        // Fallback giữ dữ liệu mặc định từ server
       });
     return () => {
       cancelled = true;
@@ -90,74 +102,73 @@ export function HeroSection({ dishes }: HeroSectionProps) {
   return (
     <section
       aria-label="Món ăn trứ danh Mở Hộp Là Nhà"
-      className="relative w-full overflow-hidden border-b border-slate-200/80 bg-white"
+      className="relative w-full overflow-hidden border-b border-rule bg-ivory"
     >
-      {/* Nền doodle nhẹ toàn chiều ngang hero */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='160' height='160' viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2320342b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='32' cy='32' r='14'/%3E%3Cpath d='M25 32h14M32 25v14'/%3E%3Cpath d='M105 22c10 0 18 8 18 18s-8 18-18 18c-3 0-12-8-12-18s9-18 12-18z'/%3E%3Cpath d='M24 106c12-10 28-6 32 8-14 6-26 2-32-8z'/%3E%3Cpath d='M106 104h28c0 12-6 20-14 20s-14-8-14-20z'/%3E%3Cpath d='M114 96c2-5 6-5 6 0M124 96c2-5 6-5 6 0'/%3E%3Cpath d='M68 72c6-8 18-8 22 0-6 8-16 8-22 0z'/%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundSize: "160px 160px",
-        }}
-      />
+      {/* Sân khấu Editorial Split-Screen */}
+      <div className="relative mx-auto flex max-w-7xl flex-col lg:min-h-[620px] lg:flex-row">
+        {/* Dải danh mục dọc bên trái phong cách tạp chí trên Desktop */}
+        <aside className="hidden w-16 shrink-0 flex-col items-center justify-between border-r border-rule bg-ivory py-10 lg:flex">
+          <span className="font-mono text-xs font-bold tracking-[0.22em] text-forest">
+            {String(activeIndex + 1).padStart(2, "0")} / {String(dishes.length).padStart(2, "0")}
+          </span>
 
-      {/* Phần thân chính: Mobile xếp dọc ưu tiên ảnh đĩa tròn, Desktop trải rộng toàn màn hình */}
-      <div className="relative mx-auto flex max-w-7xl flex-col md:min-h-[470px] md:flex-row lg:min-h-[520px] lg:px-8">
-        {/* Thanh danh mục dọc bên trái trên Desktop (dùng writing-mode dọc để không đè chữ) */}
-        <aside className="hidden w-14 shrink-0 flex-col items-center justify-center gap-6 py-10 md:flex">
-          {dishes.map((item, idx) => {
-            const isSelected = idx === activeIndex;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setActiveIndex(idx);
-                  setOrderNotice("");
-                }}
-                style={{ writingMode: "vertical-rl" }}
-                className={`rotate-180 whitespace-nowrap py-1 text-xs font-bold tracking-wider transition ${
-                  isSelected
-                    ? "text-[#b85d43]"
-                    : "text-slate-400 hover:text-[#1F2220]"
-                }`}
-              >
-                {item.categoryLabel}
-              </button>
-            );
-          })}
+          <div className="flex flex-col items-center gap-7">
+            {dishes.map((item, idx) => {
+              const isSelected = idx === activeIndex;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectDish(idx)}
+                  style={{ writingMode: "vertical-rl" }}
+                  className={`rotate-180 whitespace-nowrap py-1 font-mono text-xs font-bold uppercase tracking-[0.2em] transition-all ${
+                    isSelected
+                      ? "text-coral underline underline-offset-4 decoration-2"
+                      : "text-muted hover:text-forest"
+                  }`}
+                  aria-pressed={isSelected}
+                  aria-label={`Xem món ${item.title}`}
+                >
+                  {item.categoryLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          <span
+            style={{ writingMode: "vertical-rl" }}
+            className="rotate-180 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted/70"
+          >
+            Mở Hộp Là Nhà
+          </span>
         </aside>
 
-        {/* Khu vực đĩa món ăn trên nền tối (#1F2220) */}
-        <div className="relative flex flex-col items-center md:w-[390px] md:shrink-0 lg:w-[460px]">
-          {/* Khối nền tối: Mobile nằm trên cùng, Desktop kéo dài dọc cột đĩa */}
-          <div className="w-full bg-[#1F2220] px-4 pb-28 pt-5 text-white md:absolute md:inset-y-0 md:left-0 md:w-[74%] md:px-7 md:pb-8 md:pt-8">
+        {/* Cột đĩa món ăn: Mảng nền Deep Forest Green tương phản cao, hình ảnh lớn làm tâm điểm */}
+        <div className="relative flex flex-col items-center lg:w-[48%] lg:shrink-0">
+          {/* Mảng nền Deep Forest Green */}
+          <div className="w-full bg-forest px-4 pb-32 pt-6 text-ivory sm:px-6 lg:absolute lg:inset-y-0 lg:left-0 lg:w-[80%] lg:px-8 lg:pb-10 lg:pt-10">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-[0.22em] text-amber-200/90">
-                Mở Hộp Là Nhà
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-ivory/80">
+                Món trứ danh hôm nay
               </span>
-              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 md:hidden">
-                Món Trứ Danh
+              <span className="rounded-sm bg-coral px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-white">
+                {String(activeIndex + 1).padStart(2, "0")} / {String(dishes.length).padStart(2, "0")}
               </span>
             </div>
 
-            {/* Pill chọn món nhanh trên Mobile (< md) */}
-            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 md:hidden">
+            {/* Thanh chọn nhanh danh mục dạng tab có gạch chân cam trên Mobile */}
+            <div className="mt-4 flex gap-4 overflow-x-auto border-t border-white/15 pt-3.5 lg:hidden">
               {dishes.map((item, idx) => {
                 const isSelected = idx === activeIndex;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => {
-                      setActiveIndex(idx);
-                      setOrderNotice("");
-                    }}
-                    className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                    onClick={() => selectDish(idx)}
+                    className={`shrink-0 border-b-2 pb-1.5 font-mono text-xs font-bold uppercase tracking-[0.16em] transition-colors ${
                       isSelected
-                        ? "bg-orange-500 text-white"
-                        : "bg-white/10 text-slate-300 hover:bg-white/20"
+                        ? "border-coral text-white font-extrabold"
+                        : "border-transparent text-ivory/70 hover:text-white"
                     }`}
                   >
                     {item.categoryLabel}
@@ -167,78 +178,127 @@ export function HeroSection({ dishes }: HeroSectionProps) {
             </div>
           </div>
 
-          {/* Đĩa gốm tròn nổi bật nằm vắt qua ranh giới tối/sáng */}
-          <div className="relative z-10 -mt-24 flex justify-center md:my-auto md:ml-14 md:py-10 lg:ml-16">
-            <div className="relative h-60 w-60 overflow-hidden rounded-full border-4 border-[#2C302E] bg-[#171918] shadow-[0_24px_54px_rgba(0,0,0,0.44)] sm:h-72 sm:w-72 md:h-80 md:w-80 lg:h-[380px] lg:w-[380px]">
+          {/* Đĩa gốm tròn lớn, sắc nét, có chiều sâu, tương tác vắt qua ranh giới Forest / Ivory */}
+          <div className="relative z-10 -mt-28 flex justify-center lg:my-auto lg:ml-20 lg:py-10">
+            <div
+              key={`${active.id}-${transitionTick}`}
+              className={`relative h-64 w-64 overflow-hidden rounded-full border-4 border-white/80 bg-forest shadow-[0_24px_50px_rgba(23,63,50,0.35)] sm:h-80 sm:w-80 lg:h-[420px] lg:w-[420px] xl:h-[450px] xl:w-[450px] ${
+                transitionTick > 0
+                  ? direction === "prev"
+                    ? "animate-hero-plate-prev"
+                    : "animate-hero-plate-next"
+                  : ""
+              }`}
+            >
               <Image
                 src={active.imageSrc}
                 alt={active.title}
-                width={500}
-                height={500}
+                width={700}
+                height={700}
                 priority
-                unoptimized={active.imageSrc.endsWith(".svg")}
-                className="h-full w-full scale-[1.24] object-cover transition duration-300"
+                className="h-full w-full scale-[1.24] object-cover"
               />
             </div>
           </div>
         </div>
 
-        {/* Nội dung mô tả món, giá & nút ĐẶT NGAY */}
-        <div className="relative z-10 flex flex-1 flex-col justify-center px-5 pb-6 pt-5 text-center md:py-12 md:pl-10 md:pr-6 md:text-left lg:pl-14">
-          <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#b85d43]/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-[#b85d43]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#b85d43]" />
-              {active.tagline}
+        {/* Cột thông tin món ăn: Phân cấp thị giác rõ ràng, font chữ cá tính, thông tin dễ đọc */}
+        <div
+          key={`copy-${active.id}-${transitionTick}`}
+          className={`relative z-10 flex flex-1 flex-col justify-center px-4 pb-8 pt-6 sm:px-6 lg:py-14 lg:pl-12 lg:pr-10 ${
+            transitionTick > 0 ? "animate-hero-copy" : ""
+          }`}
+        >
+          {/* Tagline & Trạng thái suất còn */}
+          <div className="flex flex-wrap items-center gap-3 font-mono text-xs font-bold uppercase tracking-[0.16em]">
+            <span className="text-coral">
+              ● {active.tagline}
             </span>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-[11px] font-bold text-brand-800">
-              {active.grams}g · ~{active.kcal} kcal (ước tính)
+            <span className="text-rule font-normal">|</span>
+            <span
+              className={
+                isSoldOut
+                  ? "text-red-700 font-extrabold"
+                  : remaining <= 5
+                    ? "text-coral font-extrabold"
+                    : "text-forest"
+              }
+            >
+              {isSoldOut ? "Hết suất hôm nay" : `Còn ${remaining} suất`}
             </span>
           </div>
 
-          <h1 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#1F2220] sm:text-4xl lg:text-5xl">
+          {/* Tên món lớn, rõ ràng */}
+          <h1 className="mt-3.5 font-display text-4xl font-bold leading-[1.08] tracking-tight text-forest sm:text-5xl lg:text-[54px]">
             {active.title}
           </h1>
 
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base md:mx-0">
+          {/* Mô tả ngắn dễ đọc */}
+          <p className="mt-3.5 max-w-lg text-base leading-relaxed text-ink/85 sm:text-lg">
             {active.description}
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500 md:justify-start">
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
-              Protein ~{active.proteinG}g
-            </span>
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
-              Cân thực tế &amp; tem QR dinh dưỡng
-            </span>
+          {/* Bảng định lượng 3 thông số rõ ràng */}
+          <div className="mt-6 max-w-lg border-y border-rule py-4">
+            <div className="grid grid-cols-3 divide-x divide-rule">
+              <div className="pr-3">
+                <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                  Định lượng
+                </span>
+                <span className="mt-1 block font-mono text-xl font-bold tabular-nums text-forest sm:text-2xl">
+                  {active.grams}g
+                </span>
+                <span className="text-[11px] text-muted">suất chuẩn</span>
+              </div>
+              <div className="px-3 sm:px-4">
+                <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                  Năng lượng
+                </span>
+                <span className="mt-1 block font-mono text-xl font-bold tabular-nums text-forest sm:text-2xl">
+                  ~{active.kcal}
+                </span>
+                <span className="text-[11px] text-muted">kcal (ước tính)</span>
+              </div>
+              <div className="pl-3 sm:pl-4">
+                <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                  Protein
+                </span>
+                <span className="mt-1 block font-mono text-xl font-bold tabular-nums text-coral sm:text-2xl">
+                  ~{active.proteinG}g
+                </span>
+                <span className="text-[11px] text-muted">đạm sạch</span>
+              </div>
+            </div>
           </div>
 
-          {/* Hàng Giá + CTA Đặt Ngay */}
-          <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center md:justify-start lg:gap-6">
+          {/* Giá tiền nổi bật + Primary CTA cam rực rỡ + Secondary CTA xanh rừng */}
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between lg:max-w-lg">
             <div>
-              <p className="text-3xl font-black tracking-tight text-[#b85d43] lg:text-4xl">
+              <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                Giá món hôm nay
+              </span>
+              <p className="mt-0.5 font-display text-3xl font-bold tracking-tight text-coral sm:text-4xl">
                 {formatVnd(active.priceVnd)}
-              </p>
-              <p className="text-xs font-medium text-slate-500">
-                Suất chuẩn {active.grams}g · Giao nóng nội thành
               </p>
             </div>
 
-            <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 disabled={isSoldOut || ordering}
                 onClick={() => handleOrderFeatured(active)}
-                className="w-full whitespace-nowrap rounded-xl bg-[#1F2220] px-7 py-3.5 text-xs font-extrabold uppercase tracking-[0.14em] text-white shadow-md transition hover:bg-brand-950 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+                className="inline-flex min-h-[46px] items-center justify-center rounded-sm bg-coral px-7 py-3 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:bg-coral-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
               >
                 {isSoldOut
                   ? "Hết suất hôm nay"
                   : ordering
-                    ? "Đang thêm vào giỏ…"
+                    ? "Đang thêm…"
                     : `Đặt ngay (${people === 5 ? "5+" : people} người)`}
               </button>
+
               <Link
                 href="/menu"
-                className="whitespace-nowrap rounded-xl border border-slate-200 bg-white/95 px-5 py-3.5 text-center text-xs font-bold text-brand-800 transition hover:bg-brand-50"
+                className="inline-flex min-h-[46px] items-center justify-center rounded-sm border-2 border-forest bg-transparent px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest transition-colors hover:bg-forest hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
               >
                 Tùy chỉnh gram →
               </Link>
@@ -248,7 +308,7 @@ export function HeroSection({ dishes }: HeroSectionProps) {
           {orderNotice && (
             <p
               role="alert"
-              className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700"
+              className="mt-4 border-l-4 border-red-700 bg-white p-3 text-xs font-bold text-red-800"
             >
               {orderNotice}
             </p>
@@ -256,108 +316,130 @@ export function HeroSection({ dishes }: HeroSectionProps) {
         </div>
       </div>
 
-      {/* Dải 4 thẻ món nổi bật bên dưới (tương tự layout 4 thẻ tối có đĩa tròn gối lên góc trên) */}
-      <div className="relative z-10 border-t border-slate-100/90 bg-white/80 backdrop-blur-[1px]">
-        <div className="mx-auto max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-8 pt-6 md:grid-cols-4 md:gap-x-5 lg:gap-x-6">
-          {dishes.map((item, idx) => {
-            const isSelected = idx === activeIndex;
-            const liveDish = liveMenuDishes[item.id] ?? item.fallbackMenuDish;
-            const cardRemaining = liveDish.remaining_portions ?? liveDish.portion_limit;
-            const cardSoldOut = cardRemaining <= 0;
-            const shortPrice = `${Math.round(item.priceVnd / 1000)}k`;
+      {/* Dải 4 món trứ danh bên dưới: Có thumbnail, hover feedback, active state rõ ràng */}
+      <div className="border-t border-rule bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <div className="grid grid-cols-1 divide-y divide-rule sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-rule lg:grid-cols-4">
+            {dishes.map((item, idx) => {
+              const isSelected = idx === activeIndex;
+              const liveDish = liveMenuDishes[item.id] ?? item.fallbackMenuDish;
+              const cardRemaining = liveDish.remaining_portions ?? liveDish.portion_limit;
+              const cardSoldOut = cardRemaining <= 0;
 
-            return (
-              <div
-                key={item.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setActiveIndex(idx);
-                  setOrderNotice("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setActiveIndex(idx);
-                    setOrderNotice("");
-                  }
-                }}
-                className={`group relative flex cursor-pointer flex-col justify-between rounded-[1.25rem] px-3 pb-3.5 pt-11 text-left text-white transition sm:px-4 sm:pt-12 ${
-                  isSelected
-                    ? "bg-[#1F2220] shadow-lg ring-2 ring-[#b85d43]"
-                    : "bg-[#262928] opacity-95 shadow-sm hover:bg-[#1F2220]"
-                }`}
-              >
-                {/* Đĩa tròn nhỏ gối lên mép trên card */}
-                <div className="absolute -top-6 left-3 h-14 w-14 overflow-hidden rounded-full border-2 border-white/90 bg-[#171918] shadow-md transition group-hover:scale-105 sm:h-16 sm:w-16">
-                  <Image
-                    src={item.imageSrc}
-                    alt={item.shortName}
-                    width={128}
-                    height={128}
-                    unoptimized={item.imageSrc.endsWith(".svg")}
-                    className="h-full w-full scale-[1.24] object-cover"
-                  />
-                </div>
-
-                {/* Giá góc phải trên */}
-                <span className="absolute right-3 top-3 text-base font-black tracking-tight text-white sm:text-lg">
-                  {shortPrice}
-                </span>
-
-                <div>
-                  <h2 className="line-clamp-1 text-sm font-extrabold text-white">
-                    {item.shortName}
-                  </h2>
-                  <p className="mt-0.5 text-[11px] text-slate-300">
-                    {cardSoldOut ? "Hết suất" : item.tagline}
-                  </p>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-300">
-                  <span>{item.kcal} kcal</span>
-                  <button
-                    type="button"
-                    aria-label={`Đặt món ${item.shortName}`}
-                    disabled={cardSoldOut}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOrderFeatured(item);
-                    }}
-                    className="grid h-6 w-6 place-items-center rounded-full bg-white/15 text-[10px] text-white transition hover:bg-orange-500 disabled:opacity-40"
+              return (
+                <div
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectDish(idx)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selectDish(idx);
+                    }
+                  }}
+                  className={`group relative flex cursor-pointer items-center gap-3.5 bg-white p-4 transition-all sm:p-5 ${
+                    isSelected
+                      ? "ring-2 ring-inset ring-coral bg-ivory/50"
+                      : "hover:bg-ivory/30"
+                  }`}
+                  aria-pressed={isSelected}
+                  aria-label={`Chọn món ${item.shortName}`}
+                >
+                  <div
+                    className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 transition-transform duration-200 group-hover:scale-105 ${
+                      isSelected
+                        ? "border-coral shadow-sm"
+                        : "border-forest/30"
+                    }`}
                   >
-                    ▶
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <Image
+                      src={item.imageSrc}
+                      alt={item.shortName}
+                      width={140}
+                      height={140}
+                      className="h-full w-full scale-[1.24] object-cover"
+                    />
+                  </div>
 
-        {/* Chấm chỉ báo carousel phía dưới */}
-        <div className="mt-5 flex items-center justify-center gap-2">
-          {dishes.map((item, idx) => {
-            const isSelected = idx === activeIndex;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                aria-label={`Xem món ${item.shortName}`}
-                onClick={() => {
-                  setActiveIndex(idx);
-                  setOrderNotice("");
-                }}
-                className={`h-2 rounded-full transition-all ${
-                  isSelected ? "w-5 bg-[#b85d43]" : "w-2 bg-[#b85d43]/30 hover:bg-[#b85d43]/60"
-                }`}
-              />
-            );
-          })}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                        {String(idx + 1).padStart(2, "0")} · {item.kcal} kcal
+                      </span>
+                      <span className="font-mono text-xs font-bold text-coral">
+                        {formatVnd(item.priceVnd)}
+                      </span>
+                    </div>
+
+                    <h2
+                      className={`mt-0.5 truncate font-display text-base font-bold transition-colors ${
+                        isSelected ? "text-coral" : "text-forest group-hover:text-coral"
+                      }`}
+                    >
+                      {item.shortName}
+                    </h2>
+
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted">
+                        {cardSoldOut ? "Hết suất" : item.tagline}
+                      </span>
+                      <span
+                        className={`font-mono text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                          isSelected ? "text-coral font-extrabold" : "text-forest group-hover:text-coral"
+                        }`}
+                      >
+                        {isSelected ? "Đang xem" : "Xem →"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Thanh chuyển slide & pagination dot rõ ràng */}
+          <div className="flex items-center justify-between border-t border-rule py-3.5 font-mono text-xs font-bold uppercase tracking-[0.16em] text-forest">
+            <button
+              type="button"
+              aria-label="Món trước"
+              onClick={() => selectDish(activeIndex - 1, "prev")}
+              className="inline-flex min-h-[36px] items-center gap-1.5 py-1 text-forest transition-colors hover:text-coral focus-visible:outline-2 focus-visible:outline-coral"
+            >
+              ← <span className="hidden sm:inline">Món trước</span>
+            </button>
+
+            <div className="flex items-center gap-2.5">
+              {dishes.map((item, idx) => {
+                const isSelected = idx === activeIndex;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-label={`Xem món ${item.shortName}`}
+                    aria-current={isSelected ? "true" : undefined}
+                    onClick={() => selectDish(idx)}
+                    className={`h-2 rounded-full transition-all ${
+                      isSelected
+                        ? "w-8 bg-coral"
+                        : "w-2.5 bg-forest/25 hover:bg-forest/60"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              aria-label="Món tiếp theo"
+              onClick={() => selectDish(activeIndex + 1, "next")}
+              className="inline-flex min-h-[36px] items-center gap-1.5 py-1 text-forest transition-colors hover:text-coral focus-visible:outline-2 focus-visible:outline-coral"
+            >
+              <span className="hidden sm:inline">Món tiếp theo</span> →
+            </button>
           </div>
         </div>
       </div>
     </section>
   );
 }
-
