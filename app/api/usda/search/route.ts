@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
+import {
+  requireAdmin,
+  AdminUnauthorizedError,
+  extractSessionToken,
+} from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { usdaSearchQuerySchema, formatZodError } from "@/lib/validations";
+import { getClientIp, limit, rateLimitResponse } from "@/lib/ratelimit";
 
 const value = (
   nutrients: Array<{ nutrientName?: string; value?: number }> | undefined,
@@ -11,12 +16,23 @@ const value = (
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requireAdmin(request);
   } catch (err) {
     if (err instanceof AdminUnauthorizedError) {
       return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
     }
     return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
+  }
+
+  // Giới hạn tần suất: 30 lần / phút theo phiên admin
+  const sessionToken = extractSessionToken(request) || getClientIp(request);
+
+  const rateCheck = await limit("usda_search", sessionToken);
+  if (!rateCheck.ok) {
+    return rateLimitResponse(
+      rateCheck.retryAfter,
+      `Bạn đã tìm kiếm USDA quá nhanh (tối đa 30 lần/phút). Vui lòng thử lại sau ${rateCheck.retryAfter} giây.`
+    );
   }
 
   const rawQuery = new URL(request.url).searchParams.get("q");

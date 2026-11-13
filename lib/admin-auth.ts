@@ -113,12 +113,36 @@ export async function clearAdminSessionCookie(): Promise<void> {
 }
 
 /**
+ * Trích xuất session token từ Request hoặc Headers (hỗ trợ Route Handlers & tests)
+ */
+export function extractSessionToken(
+  reqOrHeaders?: Request | Headers | string | null
+): string | null {
+  if (!reqOrHeaders) return null;
+  if (typeof reqOrHeaders === "string") return reqOrHeaders;
+  const headers = reqOrHeaders instanceof Request ? reqOrHeaders.headers : reqOrHeaders;
+  const cookieHeader = headers.get("cookie");
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
  * Kiểm tra trạng thái đăng nhập admin hiện tại
  */
-export async function isAdmin(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  return verifySessionToken(token);
+export async function isAdmin(reqOrHeaders?: Request | Headers): Promise<boolean> {
+  if (reqOrHeaders) {
+    const token = extractSessionToken(reqOrHeaders);
+    if (token) return verifySessionToken(token);
+  }
+
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    return verifySessionToken(token);
+  } catch {
+    return false;
+  }
 }
 
 export class AdminUnauthorizedError extends Error {
@@ -133,8 +157,8 @@ export class AdminUnauthorizedError extends Error {
  * Hàm kiểm tra quyền bắt buộc trong MỌI route handler và server action thuộc admin.
  * Ném ra AdminUnauthorizedError nếu phiên không hợp lệ hoặc đã hết hạn.
  */
-export async function requireAdmin(): Promise<void> {
-  const authorized = await isAdmin();
+export async function requireAdmin(reqOrHeaders?: Request | Headers): Promise<void> {
+  const authorized = await isAdmin(reqOrHeaders);
   if (!authorized) {
     throw new AdminUnauthorizedError();
   }

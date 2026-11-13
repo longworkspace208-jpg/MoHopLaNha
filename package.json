@@ -7,6 +7,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
+    "test:rls": "tsx scripts/test-rls.ts",
+    "test:ratelimit": "tsx --conditions=react-server scripts/test-ratelimit.ts",
     "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {

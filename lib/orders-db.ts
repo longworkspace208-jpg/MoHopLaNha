@@ -843,6 +843,40 @@ export async function getOrderByPublicToken(token: string): Promise<OrderRecord 
   return null;
 }
 
+/**
+ * Đếm số lượng đơn hàng đang ở trạng thái 'awaiting_payment' của một số điện thoại
+ */
+export async function countAwaitingOrdersByPhone(phone: string): Promise<number> {
+  const normalizedPhone = phone.trim();
+  let dbCount = 0;
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      const { count, error } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("phone", normalizedPhone)
+        .eq("status", "awaiting_payment");
+
+      if (!error && typeof count === "number") {
+        dbCount = count;
+      }
+    } catch (err) {
+      console.warn("Supabase countAwaitingOrdersByPhone error, using fallback:", err);
+    }
+  }
+
+  ensureDemoSeedLoaded();
+  let fallbackCount = 0;
+  for (const order of globalFallback._fallbackOrders!.values()) {
+    if (order.phone.trim() === normalizedPhone && order.status === "awaiting_payment") {
+      fallbackCount++;
+    }
+  }
+  return Math.max(dbCount, fallbackCount);
+}
+
 const ALLOWED_STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   awaiting_payment: ["pending_verification"],
   pending_verification: ["paid"],

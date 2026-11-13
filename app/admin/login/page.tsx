@@ -3,9 +3,9 @@ import { adminLogin } from "../actions";
 export default async function AdminLogin({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; retryAfter?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, retryAfter } = await searchParams;
   return (
     <main className="mx-auto grid min-h-screen max-w-sm place-items-center p-5">
       <form action={adminLogin} className="w-full rounded-card bg-white p-6 shadow-soft">
@@ -15,6 +15,15 @@ export default async function AdminLogin({
         <h1 className="mt-2 text-2xl font-black text-brand-950">
           Đăng nhập quản trị
         </h1>
+        {error === "ratelimit" && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+          >
+            Bạn đã thử đăng nhập quá nhiều lần (tối đa 5 lần/15 phút). Vui lòng thử lại sau{" "}
+            {retryAfter ? `${retryAfter} giây` : "ít phút"}.
+          </p>
+        )}
         {error === "1" && (
           <p
             role="alert"

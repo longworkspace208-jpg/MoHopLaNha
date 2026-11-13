@@ -68,3 +68,4 @@ create policy "anon_select_published_combo_items"
         and public.menu_days.published = true
     )
   );
+

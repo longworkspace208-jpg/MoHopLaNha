@@ -1,12 +1,29 @@
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { isAdmin } from "@/lib/admin-auth";
-import { createOrderInDb, OutOfStockError, type OrderCreationItem } from "@/lib/orders-db";
+import {
+  createOrderInDb,
+  countAwaitingOrdersByPhone,
+  OutOfStockError,
+  type OrderCreationItem,
+} from "@/lib/orders-db";
 import { validateServiceArea } from "@/lib/delivery-config";
 import { orderCreationSchema, formatZodError } from "@/lib/validations";
+import { getClientIp, limit, rateLimitResponse } from "@/lib/ratelimit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export async function POST(request: Request) {
   try {
+    // 1. Giới hạn tần suất tạo đơn theo IP: 5 lần / 10 phút
+    const clientIp = getClientIp(request);
+    const ipCheck = await limit("orders_ip", clientIp);
+    if (!ipCheck.ok) {
+      return rateLimitResponse(
+        ipCheck.retryAfter,
+        `Bạn đã gửi quá nhiều yêu cầu tạo đơn từ địa chỉ này (tối đa 5 lần/10 phút). Vui lòng thử lại sau ${ipCheck.retryAfter} giây.`
+      );
+    }
+
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -46,7 +63,7 @@ export async function POST(request: Request) {
       items: normalizedItems,
     };
 
-    // 1. Xác thực bằng Zod schema
+    // 2. Xác thực cấu trúc dữ liệu bằng Zod
     const validationResult = orderCreationSchema.safeParse(normalizedBody);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -57,7 +74,48 @@ export async function POST(request: Request) {
 
     const validData = validationResult.data;
 
-    // 2. Kiểm tra địa chỉ thuộc vùng giao hàng (ngoại trừ admin Facebook override)
+    // 3. Giới hạn tần suất tạo đơn theo SĐT: 3 lần / 10 phút
+    const phoneCheck = await limit("orders_phone", validData.phone);
+    if (!phoneCheck.ok) {
+      return rateLimitResponse(
+        phoneCheck.retryAfter,
+        `Số điện thoại này đã tạo đơn quá nhiều lần (tối đa 3 lần/10 phút). Vui lòng thử lại sau ${phoneCheck.retryAfter} giây.`
+      );
+    }
+
+    // 4. Giới hạn nghiệp vụ: mỗi SĐT tối đa 3 đơn awaiting_payment cùng lúc
+    const awaitingCount = await countAwaitingOrdersByPhone(validData.phone);
+    if (awaitingCount >= 3) {
+      return NextResponse.json(
+        {
+          error:
+            "Số điện thoại này hiện đã có 3 đơn hàng đang chờ thanh toán. Vui lòng thanh toán hoặc hoàn tất các đơn trước khi đặt thêm đơn mới.",
+          code: "TOO_MANY_AWAITING_ORDERS",
+        },
+        { status: 409 }
+      );
+    }
+
+    // 5. Xác minh chống bot Cloudflare Turnstile (ngoại trừ admin tạo đơn thủ công)
+    const isFacebookAdmin = validData.source === "facebook" && (await isAdmin());
+    if (!isFacebookAdmin) {
+      const turnstileToken =
+        typeof body.turnstileToken === "string" ? body.turnstileToken : undefined;
+      const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
+      if (!turnstileResult.success) {
+        return NextResponse.json(
+          {
+            error:
+              turnstileResult.error ||
+              "Xác minh chống bot (Cloudflare Turnstile) không thành công. Vui lòng thử lại.",
+            code: "TURNSTILE_FAILED",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 6. Kiểm tra địa chỉ thuộc vùng giao hàng (ngoại trừ admin Facebook override)
     const allowOverride =
       validData.source === "facebook" &&
       validData.overrideArea === true &&
@@ -82,10 +140,10 @@ export async function POST(request: Request) {
             : "Đơn Facebook"
         : validData.note || null;
 
-    // 3. Tạo public_token nanoid(21) bảo mật cao, không đoán được
+    // 7. Tạo public_token nanoid(21) bảo mật cao, không đoán được
     const publicToken = nanoid(21);
 
-    // 4. Tạo đơn hàng trong DB
+    // 8. Tạo đơn hàng trong DB
     const result = await createOrderInDb({
       customerName: validData.customerName,
       phone: validData.phone,
