@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { getAllOrders } from "@/lib/orders-db";
 import { AdminNav } from "@/components/admin-nav";
 import { AdminOrdersBoard } from "@/components/admin-orders-board";
@@ -9,6 +11,10 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const [{ status }, orders] = await Promise.all([
     searchParams,
     getAllOrders(),

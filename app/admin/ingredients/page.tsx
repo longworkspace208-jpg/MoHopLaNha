@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFallbackIngredients, isSupabaseConfigured } from "@/lib/orders-db";
 import { IngredientManager } from "@/components/ingredient-manager";
@@ -6,6 +8,10 @@ import { AdminNav } from "@/components/admin-nav";
 export const dynamic = "force-dynamic";
 
 export default async function IngredientsPage() {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const configured = isSupabaseConfigured();
   let rows = getFallbackIngredients().map((ing) => ({
     ...ing,

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { nanoid } from "nanoid";
 import { createServerSupabaseClient } from "./supabase/server";
 import { calcDish, calcPortion, type Macros } from "./nutrition";
 import type { CookingBatch, OrderItemSnapshot, OrderRecord, OrderStatus, PortionSnapshot } from "./types";
@@ -202,6 +203,7 @@ export function resetFallbackDemoData(): void {
 
     orders.set(spec.id, {
       id: spec.id,
+      public_token: (spec as { publicToken?: string }).publicToken || `tok_demo_${spec.publicCode.toLowerCase()}`,
       public_code: spec.publicCode,
       customer_name: spec.customerName,
       phone: spec.phone,
@@ -442,6 +444,15 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
         if (!Number.isFinite(reqItem.grams) || reqItem.grams <= 0) {
           throw new Error(`Khối lượng phần ăn ${dish.name} không hợp lệ.`);
         }
+        if (reqItem.grams < 50) {
+          throw new Error(`Định lượng món "${dish.name}" tối thiểu là 50g.`);
+        }
+        if (reqItem.grams > 2000) {
+          throw new Error(`Định lượng món "${dish.name}" tối đa là 2,000g.`);
+        }
+        if (reqItem.grams % 10 !== 0) {
+          throw new Error(`Định lượng món "${dish.name}" (${reqItem.grams}g) phải là bội số của 10g.`);
+        }
 
         const ingredientsForDish = (recipeRows ?? [])
           .filter((r) => r.dish_id === dish.id)
@@ -508,6 +519,15 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
     if (!Number.isFinite(reqItem.grams) || reqItem.grams <= 0) {
       throw new Error(`Khối lượng phần ăn ${dish.name} không hợp lệ.`);
     }
+    if (dish.min_g && reqItem.grams < dish.min_g) {
+      throw new Error(`Định lượng món "${dish.name}" tối thiểu là ${dish.min_g}g.`);
+    }
+    if (dish.max_g && reqItem.grams > dish.max_g) {
+      throw new Error(`Định lượng món "${dish.name}" tối đa là ${dish.max_g}g.`);
+    }
+    if (dish.step_g && reqItem.grams % dish.step_g !== 0 && (reqItem.grams - dish.min_g) % dish.step_g !== 0) {
+      throw new Error(`Định lượng món "${dish.name}" (${reqItem.grams}g) phải là bội số của ${dish.step_g}g.`);
+    }
 
     const portionNutrition = calcPortion(dish.nutrition_per100, reqItem.grams);
     const itemPrice = Math.round((dish.price_vnd / dish.yield_g) * reqItem.grams);
@@ -539,10 +559,11 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
 /**
  * Tạo đơn hàng mới trong DB / Fallback
  */
-export async function createOrderInDb(input: OrderCreationInput): Promise<{ orderId: string; publicCode: string }> {
+export async function createOrderInDb(input: OrderCreationInput & { publicToken?: string }): Promise<{ orderId: string; publicCode: string; publicToken: string }> {
   const calculated = await calculateOrderFromDb(input.items);
   const publicCode = await generateUniqueOrderCode();
   const orderId = crypto.randomUUID();
+  const publicToken = input.publicToken || nanoid(21);
 
   if (isSupabaseConfigured()) {
     try {
@@ -551,6 +572,7 @@ export async function createOrderInDb(input: OrderCreationInput): Promise<{ orde
         .from("orders")
         .insert({
           id: orderId,
+          public_token: publicToken,
           public_code: publicCode,
           customer_name: input.customerName,
           phone: input.phone,
@@ -562,7 +584,7 @@ export async function createOrderInDb(input: OrderCreationInput): Promise<{ orde
           total_vnd: calculated.total,
           nutrition_snapshot: calculated.nutrition
         })
-        .select("id, public_code")
+        .select("id, public_code, public_token")
         .single();
 
       if (orderError || !order) {
@@ -588,7 +610,7 @@ export async function createOrderInDb(input: OrderCreationInput): Promise<{ orde
         throw new Error(itemsError.message);
       }
 
-      return { orderId: order.id, publicCode: order.public_code };
+      return { orderId: order.id, publicCode: order.public_code, publicToken: order.public_token || publicToken };
     } catch (err) {
       console.warn("Supabase order creation failed, persisting to fallback:", err);
     }
@@ -597,6 +619,7 @@ export async function createOrderInDb(input: OrderCreationInput): Promise<{ orde
   // Lưu fallback
   const record: OrderRecord = {
     id: orderId,
+    public_token: publicToken,
     public_code: publicCode,
     customer_name: input.customerName,
     phone: input.phone,
@@ -613,11 +636,12 @@ export async function createOrderInDb(input: OrderCreationInput): Promise<{ orde
   };
 
   globalFallback._fallbackOrders!.set(orderId, record);
-  return { orderId, publicCode };
+  return { orderId, publicCode, publicToken };
 }
 
 type DbOrderRow = {
   id: string;
+  public_token?: string | null;
   public_code: string;
   customer_name: string;
   phone: string;
@@ -656,6 +680,7 @@ function mapOrderRow(order: DbOrderRow, items: DbOrderItemRow[]): OrderRecord {
 
   return {
     id: order.id,
+    public_token: order.public_token || order.id,
     public_code: order.public_code,
     customer_name: order.customer_name,
     phone: order.phone,
@@ -781,6 +806,39 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
 
   for (const order of globalFallback._fallbackOrders!.values()) {
     if (order.public_code === code) return order;
+  }
+  return null;
+}
+
+/**
+ * Lấy chi tiết đơn hàng theo public_token (nanoid 21 ký tự) cho route khách hàng
+ */
+export async function getOrderByPublicToken(token: string): Promise<OrderRecord | null> {
+  ensureDemoSeedLoaded();
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      const { data: order } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("public_token", token)
+        .maybeSingle();
+
+      if (order) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("*")
+          .eq("order_id", order.id);
+
+        return mapOrderRow(order as DbOrderRow, (items ?? []) as DbOrderItemRow[]);
+      }
+    } catch (err) {
+      console.warn("Supabase getOrderByPublicToken error, using fallback:", err);
+    }
+  }
+
+  for (const order of globalFallback._fallbackOrders!.values()) {
+    if (order.public_token === token) return order;
   }
   return null;
 }

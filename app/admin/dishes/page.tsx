@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   getFallbackDishes,
@@ -11,6 +13,10 @@ import { approveDish, createDish } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function DishesPage() {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const configured = isSupabaseConfigured();
   let ingredients = getFallbackIngredients().map((i) => ({
     id: i.id,

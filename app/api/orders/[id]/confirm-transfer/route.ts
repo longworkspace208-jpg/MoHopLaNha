@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOrderById, updateOrderStatus } from "@/lib/orders-db";
+import { getOrderById, getOrderByPublicToken, updateOrderStatus } from "@/lib/orders-db";
 
 export async function POST(
   _request: Request,
@@ -7,7 +7,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const order = await getOrderById(id);
+    const order = (await getOrderByPublicToken(id)) ?? (await getOrderById(id));
 
     if (!order) {
       return NextResponse.json(

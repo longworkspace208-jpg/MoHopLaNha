@@ -36,6 +36,7 @@ export type OrderItemSnapshot = {
 
 export type OrderRecord = {
   id: string;
+  public_token: string;
   public_code: string;
   customer_name: string;
   phone: string;

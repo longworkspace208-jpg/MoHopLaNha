@@ -1,8 +1,8 @@
 export const BANK_CONFIG = {
-  bin: process.env.BANK_BIN || "970422", // Mặc định MBBank
-  account: process.env.BANK_ACCOUNT || "0357787937",
-  accountName: process.env.BANK_ACCOUNT_NAME || "MO HOP LA NHA",
-  bankName: "MBBank (Ngân hàng TMCP Quân đội)"
+  bin: process.env.BANK_BIN || "970436", // Vietcombank: 970436 (hoặc MBBank: 970422)
+  account: process.env.BANK_ACCOUNT || "1024021346",
+  accountName: process.env.BANK_ACCOUNT_NAME || "THAI THI THUY TRANG",
+  bankName: process.env.BANK_NAME || "Vietcombank (Ngân hàng TMCP Ngoại thương Việt Nam)"
 };
 
 /**

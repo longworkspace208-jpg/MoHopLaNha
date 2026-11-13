@@ -2,6 +2,7 @@ create type public.order_status as enum ('awaiting_payment', 'pending_verificati
 
 create table public.orders (
   id uuid primary key default gen_random_uuid(),
+  public_token text unique not null,
   public_code text unique not null,
   customer_name text not null,
   phone text not null,
@@ -147,3 +148,61 @@ create table if not exists public.nutrition_snapshots (
   packed_at timestamptz not null default now()
 );
 alter table public.nutrition_snapshots enable row level security;
+
+-- Row Level Security (RLS) policies for anon (public read-only)
+-- Only approved dishes and published menus/combos are visible to anon.
+-- All other tables (orders, order_items, ingredients, cooking_batches, nutrition_snapshots)
+-- have NO policy for anon and can only be accessed via server service role.
+drop policy if exists "anon_select_approved_dishes" on public.dishes;
+create policy "anon_select_approved_dishes"
+  on public.dishes
+  for select
+  to anon
+  using (approved = true);
+
+drop policy if exists "anon_select_published_menu_days" on public.menu_days;
+create policy "anon_select_published_menu_days"
+  on public.menu_days
+  for select
+  to anon
+  using (published = true);
+
+drop policy if exists "anon_select_published_menu_dishes" on public.menu_dishes;
+create policy "anon_select_published_menu_dishes"
+  on public.menu_dishes
+  for select
+  to anon
+  using (
+    exists (
+      select 1 from public.menu_days
+      where public.menu_days.id = public.menu_dishes.menu_day_id
+        and public.menu_days.published = true
+    )
+  );
+
+drop policy if exists "anon_select_published_combos" on public.combos;
+create policy "anon_select_published_combos"
+  on public.combos
+  for select
+  to anon
+  using (
+    exists (
+      select 1 from public.menu_days
+      where public.menu_days.id = public.combos.menu_day_id
+        and public.menu_days.published = true
+    )
+  );
+
+drop policy if exists "anon_select_published_combo_items" on public.combo_items;
+create policy "anon_select_published_combo_items"
+  on public.combo_items
+  for select
+  to anon
+  using (
+    exists (
+      select 1 from public.combos
+      join public.menu_days on public.menu_days.id = public.combos.menu_day_id
+      where public.combos.id = public.combo_items.combo_id
+        and public.menu_days.published = true
+    )
+  );

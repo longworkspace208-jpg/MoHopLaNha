@@ -38,7 +38,9 @@
       "protein_per100": 20.4,
       "carbs_per100": 0,
       "fat_per100": 13.4,
-      "allergens": ["Cá"]
+      "allergens": [
+        "Cá"
+      ]
     },
     {
       "id": "ing-khoai-lang",
@@ -58,7 +60,9 @@
       "protein_per100": 8.1,
       "carbs_per100": 1.9,
       "fat_per100": 4.8,
-      "allergens": ["Đậu nành"]
+      "allergens": [
+        "Đậu nành"
+      ]
     },
     {
       "id": "ing-nam-dui-ga",
@@ -104,11 +108,24 @@
       "step_g": 50,
       "min_g": 200,
       "max_g": 500,
-      "combos": { "balanced": 250, "light": 150, "protein": 300 },
+      "combos": {
+        "balanced": 250,
+        "light": 150,
+        "protein": 300
+      },
       "recipe": [
-        { "ingredientId": "ing-uc-ga", "raw_g": 200 },
-        { "ingredientId": "ing-gao-lut", "raw_g": 150 },
-        { "ingredientId": "ing-rau-cu", "raw_g": 100 }
+        {
+          "ingredientId": "ing-uc-ga",
+          "raw_g": 200
+        },
+        {
+          "ingredientId": "ing-gao-lut",
+          "raw_g": 150
+        },
+        {
+          "ingredientId": "ing-rau-cu",
+          "raw_g": 100
+        }
       ]
     },
     {
@@ -123,11 +140,22 @@
       "step_g": 50,
       "min_g": 200,
       "max_g": 500,
-      "combos": { "protein": 200 },
+      "combos": {
+        "protein": 200
+      },
       "recipe": [
-        { "ingredientId": "ing-ca-hoi", "raw_g": 180 },
-        { "ingredientId": "ing-khoai-lang", "raw_g": 150 },
-        { "ingredientId": "ing-rau-cu", "raw_g": 100 }
+        {
+          "ingredientId": "ing-ca-hoi",
+          "raw_g": 180
+        },
+        {
+          "ingredientId": "ing-khoai-lang",
+          "raw_g": 150
+        },
+        {
+          "ingredientId": "ing-rau-cu",
+          "raw_g": 100
+        }
       ]
     },
     {
@@ -142,11 +170,23 @@
       "step_g": 50,
       "min_g": 200,
       "max_g": 500,
-      "combos": { "balanced": 150, "light": 200 },
+      "combos": {
+        "balanced": 150,
+        "light": 200
+      },
       "recipe": [
-        { "ingredientId": "ing-dau-hu", "raw_g": 200 },
-        { "ingredientId": "ing-nam-dui-ga", "raw_g": 150 },
-        { "ingredientId": "ing-gao-lut", "raw_g": 100 }
+        {
+          "ingredientId": "ing-dau-hu",
+          "raw_g": 200
+        },
+        {
+          "ingredientId": "ing-nam-dui-ga",
+          "raw_g": 150
+        },
+        {
+          "ingredientId": "ing-gao-lut",
+          "raw_g": 100
+        }
       ]
     },
     {
@@ -163,9 +203,18 @@
       "max_g": 500,
       "combos": {},
       "recipe": [
-        { "ingredientId": "ing-thit-heo", "raw_g": 220 },
-        { "ingredientId": "ing-gao-lut", "raw_g": 150 },
-        { "ingredientId": "ing-rau-cu", "raw_g": 80 }
+        {
+          "ingredientId": "ing-thit-heo",
+          "raw_g": 220
+        },
+        {
+          "ingredientId": "ing-gao-lut",
+          "raw_g": 150
+        },
+        {
+          "ingredientId": "ing-rau-cu",
+          "raw_g": 80
+        }
       ]
     },
     {
@@ -182,9 +231,18 @@
       "max_g": 450,
       "combos": {},
       "recipe": [
-        { "ingredientId": "ing-bo-than", "raw_g": 180 },
-        { "ingredientId": "ing-khoai-lang", "raw_g": 120 },
-        { "ingredientId": "ing-rau-cu", "raw_g": 100 }
+        {
+          "ingredientId": "ing-bo-than",
+          "raw_g": 180
+        },
+        {
+          "ingredientId": "ing-khoai-lang",
+          "raw_g": 120
+        },
+        {
+          "ingredientId": "ing-rau-cu",
+          "raw_g": 100
+        }
       ]
     }
   ],
@@ -216,7 +274,13 @@
       "customerEmail": "minhanh@example.com",
       "deliveryAddress": "28 Đồng Khởi, Bến Nghé, Quận 1",
       "note": "Mẫu đơn chờ thanh toán",
-      "items": [{ "dishId": "ga-nuong-com-gao-lut", "grams": 350 }]
+      "items": [
+        {
+          "dishId": "ga-nuong-com-gao-lut",
+          "grams": 350
+        }
+      ],
+      "publicToken": "tok_demo_mhln1001_001"
     },
     {
       "id": "44444444-4444-4444-8444-000000000002",
@@ -227,7 +291,13 @@
       "customerEmail": "baongoc@example.com",
       "deliveryAddress": "120 Pasteur, Võ Thị Sáu, Quận 3",
       "note": "Mẫu đơn chờ đối soát chuyển khoản",
-      "items": [{ "dishId": "ca-hoi-sot-chanh", "grams": 300 }]
+      "items": [
+        {
+          "dishId": "ca-hoi-sot-chanh",
+          "grams": 300
+        }
+      ],
+      "publicToken": "tok_demo_mhln1002_002"
     },
     {
       "id": "44444444-4444-4444-8444-000000000003",
@@ -238,7 +308,13 @@
       "customerEmail": null,
       "deliveryAddress": "45 Phan Xích Long, Phường 2, Phú Nhuận",
       "note": "Mẫu đơn đã xác nhận thanh toán",
-      "items": [{ "dishId": "dau-hu-nam-hat", "grams": 350 }]
+      "items": [
+        {
+          "dishId": "dau-hu-nam-hat",
+          "grams": 350
+        }
+      ],
+      "publicToken": "tok_demo_mhln1003_003"
     },
     {
       "id": "44444444-4444-4444-8444-000000000004",
@@ -249,7 +325,13 @@
       "customerEmail": null,
       "deliveryAddress": "88 Xô Viết Nghệ Tĩnh, Phường 19, Bình Thạnh",
       "note": "Mẫu đơn bếp đang chế biến",
-      "items": [{ "dishId": "ga-nuong-com-gao-lut", "grams": 300 }]
+      "items": [
+        {
+          "dishId": "ga-nuong-com-gao-lut",
+          "grams": 300
+        }
+      ],
+      "publicToken": "tok_demo_mhln1004_004"
     },
     {
       "id": "44444444-4444-4444-8444-000000000005",
@@ -260,7 +342,12 @@
       "customerEmail": "hoangnam@example.com",
       "deliveryAddress": "64 Hoàng Diệu, Phường 12, Quận 4",
       "note": "Mẫu đơn đã đóng gói kèm tem QR",
-      "items": [{ "dishId": "ga-nuong-com-gao-lut", "grams": 350 }],
+      "items": [
+        {
+          "dishId": "ga-nuong-com-gao-lut",
+          "grams": 350
+        }
+      ],
       "portionSnapshot": {
         "id": "55555555-5555-4555-8555-000000000001",
         "qrCode": "MHLN1005-GA-001",
@@ -269,7 +356,8 @@
         "cookedBatchId": "33333333-3333-4333-8333-000000000001",
         "lotCode": "LOT-DEMO-GA-01",
         "sourceNote": "Trang trại Ức Gà Sạch Đồng Nai · Lô sáng"
-      }
+      },
+      "publicToken": "tok_demo_mhln1005_005"
     },
     {
       "id": "44444444-4444-4444-8444-000000000006",
@@ -280,7 +368,12 @@
       "customerEmail": "lanphuong@example.com",
       "deliveryAddress": "15 Nguyễn Thị Minh Khai, Bến Nghé, Quận 1",
       "note": "Mẫu đơn đã giao thành công (món bò hết suất)",
-      "items": [{ "dishId": "bo-ap-chao-mang-tay", "grams": 350 }],
+      "items": [
+        {
+          "dishId": "bo-ap-chao-mang-tay",
+          "grams": 350
+        }
+      ],
       "portionSnapshot": {
         "id": "55555555-5555-4555-8555-000000000002",
         "qrCode": "MHLN1006-BO-001",
@@ -289,7 +382,8 @@
         "cookedBatchId": "33333333-3333-4333-8333-000000000002",
         "lotCode": "LOT-DEMO-BO-01",
         "sourceNote": "Thăn bò Úc chuẩn VietGAP & Măng tây Ninh Thuận"
-      }
+      },
+      "publicToken": "tok_demo_mhln1006_006"
     },
     {
       "id": "44444444-4444-4444-8444-000000000007",
@@ -300,8 +394,13 @@
       "customerEmail": null,
       "deliveryAddress": "210 Nguyễn Đình Chiểu, Phường 6, Quận 3",
       "note": "Mẫu đơn khách hủy trước khi chế biến",
-      "items": [{ "dishId": "thit-kho-trung-gao-lut", "grams": 350 }]
+      "items": [
+        {
+          "dishId": "thit-kho-trung-gao-lut",
+          "grams": 350
+        }
+      ],
+      "publicToken": "tok_demo_mhln1007_007"
     }
   ]
 }
-

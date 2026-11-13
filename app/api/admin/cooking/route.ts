@@ -1,41 +1,38 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
 import { saveCookingBatch, getAllCookingBatches, isSupabaseConfigured } from "@/lib/orders-db";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { cookingBatchCreateSchema, formatZodError } from "@/lib/validations";
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 401 });
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminUnauthorizedError) {
+      return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
   }
 
   try {
-    const body = await request.json();
-    const dishId = String(body.dishId ?? "").trim();
-    const dishName = String(body.dishName ?? "").trim();
-    const lotCode = String(body.lotCode ?? "").trim();
-    const supplierNote = body.supplierNote ? String(body.supplierNote).trim() : null;
-    const cookedYieldG = Number(body.cookedYieldG);
-    const cookedAt = String(body.cookedAt ?? "").trim();
+    const rawBody = await request.json().catch(() => ({}));
+    const validation = cookingBatchCreateSchema.safeParse(rawBody);
 
-    if (!dishId || !dishName || !lotCode || !cookedAt) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Thiếu thông tin bắt buộc: dishId, dishName, lotCode, cookedYieldG, cookedAt." },
+        { error: formatZodError(validation.error) },
         { status: 400 }
       );
     }
 
-    if (!Number.isFinite(cookedYieldG) || cookedYieldG <= 0) {
-      return NextResponse.json(
-        { error: "cookedYieldG phải là số dương." },
-        { status: 400 }
-      );
-    }
+    const { dishId, dishName, lotCode, supplierNote, cookedYieldG, cookedAt } =
+      validation.data;
 
     const batch = await saveCookingBatch({
       dishId,
       dishName,
       lotCode,
-      supplierNote,
+      supplierNote: supplierNote ?? null,
       cookedYieldG,
       cookedAt,
     });
@@ -50,8 +47,13 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 401 });
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminUnauthorizedError) {
+      return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
   }
 
   try {

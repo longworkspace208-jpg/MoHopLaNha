@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getOrderById } from "@/lib/orders-db";
+import { getOrderByPublicToken } from "@/lib/orders-db";
 import { generateVietQrPayload, getVietQrImageUrl } from "@/lib/bank-config";
 import { PaymentView } from "@/components/payment-view";
 
@@ -8,10 +8,11 @@ export const dynamic = "force-dynamic";
 export default async function PaymentPage({
   params,
 }: {
-  params: Promise<{ orderId: string }>;
+  params: Promise<{ token: string }>;
 }) {
-  const { orderId } = await params;
-  const order = await getOrderById(orderId);
+  const { token } = await params;
+  const decodedToken = decodeURIComponent(token).trim();
+  const order = await getOrderByPublicToken(decodedToken);
 
   if (!order) {
     notFound();

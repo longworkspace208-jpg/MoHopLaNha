@@ -1,4 +1,48 @@
 import type { NextConfig } from "next";
-// Enables isolated build output for CI or local verification when a dev server is running.
-const nextConfig: NextConfig = { distDir: process.env.NEXT_DIST_DIR ?? ".next" };
+
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com data:;
+  img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://images.unsplash.com https://*.unsplash.com;
+  connect-src 'self' https://*.supabase.co https://api.vietqr.io https://api.nal.usda.gov;
+  frame-ancestors 'none';
+  object-src 'none';
+  base-uri 'self';
+`.replace(/\s{2,}/g, " ").trim();
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: cspHeader },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+];
+
+const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      {
+        source: "/admin/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+      {
+        source: "/n/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+    ];
+  },
+};
+
 export default nextConfig;

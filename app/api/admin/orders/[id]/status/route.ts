@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
 import { getOrderById, updateOrderStatusWithTimestamp } from "@/lib/orders-db";
+import { orderStatusUpdateSchema, formatZodError } from "@/lib/validations";
 import type { OrderStatus } from "@/lib/types";
 
 const ADMIN_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -14,8 +15,13 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 401 });
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminUnauthorizedError) {
+      return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
   }
 
   const { id } = await params;
@@ -26,12 +32,22 @@ export async function POST(
       return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
     }
 
-    const body = await request.json();
-    const newStatus = (body.newStatus ?? body.status) as OrderStatus | undefined;
+    const body = await request.json().catch(() => ({}));
+    const rawStatus = body.newStatus ?? body.status;
+    const validation = orderStatusUpdateSchema.safeParse({ status: rawStatus });
 
-    if (!newStatus || ADMIN_TRANSITIONS[order.status] !== newStatus) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: `Không thể chuyển từ "${order.status}" sang "${newStatus ?? ""}".` },
+        { error: formatZodError(validation.error) },
+        { status: 400 }
+      );
+    }
+
+    const newStatus = validation.data.status;
+
+    if (ADMIN_TRANSITIONS[order.status] !== newStatus) {
+      return NextResponse.json(
+        { error: `Không thể chuyển từ "${order.status}" sang "${newStatus}".` },
         { status: 409 }
       );
     }

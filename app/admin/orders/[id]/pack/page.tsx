@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import {
   getAllCookingBatches,
   getOrderById,
@@ -42,6 +43,10 @@ export default async function AdminOrderPackPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const { id } = await params;
   const [order, batches] = await Promise.all([
     getOrderById(id),

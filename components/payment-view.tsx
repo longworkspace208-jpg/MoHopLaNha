@@ -58,7 +58,7 @@ export function PaymentView({
     setError("");
 
     try {
-      const res = await fetch(`/api/orders/${order.id}/confirm-transfer`, {
+      const res = await fetch(`/api/orders/${order.public_token}/confirm-transfer`, {
         method: "POST",
       });
       const data = await res.json();
@@ -67,7 +67,7 @@ export function PaymentView({
         throw new Error(data.error ?? "Không thể cập nhật trạng thái đơn hàng.");
       }
 
-      router.push(`/orders/${order.public_code}`);
+      router.push(`/orders/${order.public_token}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra.");
       setIsSubmitting(false);

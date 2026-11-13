@@ -272,6 +272,7 @@ async function seedSupabase() {
 
     const { error: ordErr } = await db.from("orders").insert({
       id: spec.id,
+      public_token: spec.publicToken,
       public_code: spec.publicCode,
       customer_name: spec.customerName,
       phone: spec.phone,

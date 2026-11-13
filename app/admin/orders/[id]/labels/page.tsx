@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { getOrderById, getPortionsByOrder } from "@/lib/orders-db";
 import { AdminNav } from "@/components/admin-nav";
 import { PrintButton } from "@/components/print-button";
@@ -13,6 +14,10 @@ export default async function AdminOrderLabelsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const { id } = await params;
   const order = await getOrderById(id);
 

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFallbackDishes, isSupabaseConfigured } from "@/lib/orders-db";
 import { MenuBuilder } from "@/components/menu-builder";
@@ -7,6 +9,10 @@ import { publishDailyMenu, saveDailyMenu } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const configured = isSupabaseConfigured();
   let dishes = getFallbackDishes()
     .filter((d) => d.approved)

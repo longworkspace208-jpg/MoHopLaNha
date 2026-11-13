@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
 import {
   getCookingBatch,
   getDishIngredientsSnapshot,
@@ -74,8 +74,13 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 401 });
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminUnauthorizedError) {
+      return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
   }
 
   const { id } = await params;
@@ -101,7 +106,7 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const portions: PortionInput[] = body.portions ?? [];
 
     if (!Array.isArray(portions) || portions.length === 0) {
@@ -114,92 +119,89 @@ export async function POST(
     for (let idx = 0; idx < portions.length; idx++) {
       const portion = portions[idx];
 
-      // Match by item.id if provided, otherwise fall back to positional index
       const item =
-        (portion.orderItemId != null
+        portion.orderItemId != null
           ? order.items.find((it) => it.id != null && String(it.id) === String(portion.orderItemId))
-          : undefined) ?? order.items[idx];
+          : order.items[idx];
 
       if (!item) {
         return NextResponse.json(
-          { error: `Không tìm thấy order_item tại vị trí ${idx}.` },
+          { error: `Không tìm thấy order item cho portion thứ ${idx + 1}.` },
           { status: 400 }
         );
       }
 
-      const originalGrams = item.grams;
       const actualGrams = Number(portion.actualGrams);
-
-      if (!Number.isFinite(actualGrams) || actualGrams <= 0) {
+      if (!Number.isFinite(actualGrams) || actualGrams <= 0 || actualGrams > 10000) {
         return NextResponse.json(
-          { error: `actualGrams không hợp lệ tại portion index ${idx}.` },
+          { error: `actualGrams của "${item.name}" phải là số dương hợp lệ (tối đa 10,000g).` },
           { status: 400 }
         );
       }
 
-      const scale = originalGrams > 0 ? actualGrams / originalGrams : 1;
-      const kcal = Number(((item.nutrition.kcal ?? 0) * scale).toFixed(2));
-      const proteinG = Number(((item.nutrition.protein ?? 0) * scale).toFixed(2));
-      const carbsG = Number(((item.nutrition.carbs ?? 0) * scale).toFixed(2));
-      const fatG = Number(((item.nutrition.fat ?? 0) * scale).toFixed(2));
+      const seq = String(idx + 1).padStart(3, "0");
+      const prefix = toAsciiUpperPrefix(item.name);
+      const qrCode = `${order.public_code}-${prefix}-${seq}`;
 
-      const validBatchId = isUuid(portion.cookedBatchId) ? portion.cookedBatchId.trim() : null;
-      const batch = await resolveCookingBatch(validBatchId);
+      const nominalGrams = item.grams > 0 ? item.grams : actualGrams;
+      const ratio = actualGrams / nominalGrams;
+      const kcal = Number((item.nutrition.kcal * ratio).toFixed(2));
+      const proteinG = Number((item.nutrition.protein * ratio).toFixed(2));
+      const carbsG = Number((item.nutrition.carbs * ratio).toFixed(2));
+      const fatG = Number((item.nutrition.fat * ratio).toFixed(2));
 
-      const ingredients =
-        Array.isArray(portion.ingredients) && portion.ingredients.length > 0
+      const batch = await resolveCookingBatch(portion.cookedBatchId);
+
+      const ingredientsSnapshot =
+        portion.ingredients && portion.ingredients.length > 0
           ? portion.ingredients.map((ing) => ({
-              name: String(ing.name ?? ""),
-              rawG: Number(ing.rawG ?? 0),
-              allergens: Array.isArray(ing.allergens) ? ing.allergens : [],
+              name: ing.name,
+              rawG: ing.rawG,
+              allergens: ing.allergens ?? [],
             }))
           : await getDishIngredientsSnapshot(item.dishId);
 
-      const allergens = Array.from(
-        new Set([
-          ...ingredients.flatMap((ing) => ing.allergens ?? []),
-          ...(Array.isArray(portion.allergens) ? portion.allergens : []),
-        ])
-      );
+      const allergens =
+        portion.allergens && portion.allergens.length > 0
+          ? portion.allergens
+          : Array.from(
+              new Set(
+                ingredientsSnapshot.flatMap((ing) => ing.allergens ?? [])
+              )
+            );
 
-      const dishShortCode = toAsciiUpperPrefix(item.name);
-      const qrCode = `${order.public_code}-${dishShortCode}-${String(idx + 1).padStart(3, "0")}`;
-
-      const cookedAtRaw = portion.cookedAt || batch?.cookedAt || packedAt;
-      const cookedAt = String(cookedAtRaw).slice(0, 10);
-
-      const numericItemId = Number.isFinite(Number(portion.orderItemId))
-        ? Number(portion.orderItemId)
-        : Number.isFinite(Number(item.id))
-          ? Number(item.id)
-          : idx + 1;
+      const cookedAt =
+        portion.cookedAt ??
+        (batch?.cookedAt ? batch.cookedAt.slice(0, 10) : packedAt.slice(0, 10));
+      const sourceNote = portion.sourceNote ?? batch?.supplierNote ?? null;
+      const lotCode = portion.lotCode ?? batch?.lotCode ?? null;
 
       const saved = await savePortionSnapshot({
         orderId: order.id,
-        orderItemId: numericItemId,
+        orderItemId: Number(item.id ?? idx + 1),
         qrCode,
         dishName: item.name,
         cookedAt,
-        cookedBatchId: validBatchId,
+        cookedBatchId: isUuid(portion.cookedBatchId) ? portion.cookedBatchId.trim() : null,
         actualGrams,
         kcal,
         proteinG,
         carbsG,
         fatG,
-        ingredients,
+        ingredients: ingredientsSnapshot,
         allergens,
-        sourceNote: portion.sourceNote ?? batch?.supplierNote ?? null,
-        lotCode: portion.lotCode ?? batch?.lotCode ?? null,
+        sourceNote,
+        lotCode,
         packedAt,
       });
 
       savedPortions.push(saved);
     }
 
-    const statusResult = await updateOrderStatusWithTimestamp(id, "packed");
-    if (!statusResult.ok) {
+    const result = await updateOrderStatusWithTimestamp(id, "packed");
+    if (!result.ok) {
       return NextResponse.json(
-        { error: statusResult.error ?? "Không thể chuyển trạng thái sang packed." },
+        { error: result.error ?? "Không thể cập nhật trạng thái sang packed." },
         { status: 409 }
       );
     }

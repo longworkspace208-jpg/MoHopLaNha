@@ -1,10 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import { AdminNav } from "@/components/admin-nav";
 import { FacebookOrderForm } from "@/components/facebook-order-form";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminFacebookOrderPage() {
+export default async function AdminFacebookOrderPage() {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   return (
     <main className="mx-auto max-w-4xl p-5">
       <AdminNav active="facebook" />
@@ -18,14 +24,15 @@ export default function AdminFacebookOrderPage() {
         </Link>
       </div>
 
-      <header className="mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-black text-brand-950">
-          Nhập đơn hàng từ Facebook
+          Tạo đơn Facebook / Chat
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Tạo đơn nội bộ cho khách đặt qua tin nhắn Facebook. Đơn mới sẽ ở trạng thái chờ thanh toán / đối soát.
+          Dành cho nhân viên trực fanpage chốt đơn nhanh qua tin nhắn, tự động
+          sinh mã VietQR và kiểm tra định lượng gram hợp lệ.
         </p>
-      </header>
+      </div>
 
       <FacebookOrderForm />
     </main>

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { isAdmin } from "@/lib/admin-auth";
 import {
   getAllCookingBatches,
   getFallbackDishes,
@@ -55,6 +57,10 @@ async function loadDishOptions(): Promise<Array<{ id: string; name: string }>> {
 }
 
 export default async function AdminCookingPage() {
+  if (!(await isAdmin())) {
+    redirect("/admin/login");
+  }
+
   const [batches, dishes] = await Promise.all([
     loadBatches(),
     loadDishOptions(),

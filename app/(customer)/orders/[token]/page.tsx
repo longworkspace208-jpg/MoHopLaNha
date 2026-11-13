@@ -1,10 +1,23 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getOrderByCode } from "@/lib/orders-db";
+import { getOrderByPublicToken } from "@/lib/orders-db";
 import { formatVnd } from "@/lib/format";
 import type { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function maskPhone(phone: string): string {
+  const cleaned = phone.trim();
+  if (cleaned.length >= 10) {
+    return `${cleaned.slice(0, 3)}****${cleaned.slice(-3)}`;
+  }
+  return cleaned.slice(0, 2) + "****";
+}
+
+function maskAddress(addr: string): string {
+  // Ẩn số nhà cụ thể để bảo vệ quyền riêng tư người nhận
+  return addr.replace(/^\d+[\w/-]*\s+/, "*** ");
+}
 
 const STATUS_CONFIG: Record<
   OrderStatus,
@@ -61,10 +74,11 @@ const STATUS_CONFIG: Record<
 export default async function OrderStatusPage({
   params,
 }: {
-  params: Promise<{ code: string }>;
+  params: Promise<{ token: string }>;
 }) {
-  const { code } = await params;
-  const order = await getOrderByCode(code);
+  const { token } = await params;
+  const decodedToken = decodeURIComponent(token).trim();
+  const order = await getOrderByPublicToken(decodedToken);
 
   if (!order) {
     notFound();
@@ -89,6 +103,9 @@ export default async function OrderStatusPage({
           <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight text-forest">
             #{order.public_code}
           </h1>
+          <p className="mt-1 font-mono text-xs text-muted">
+            Mã chuyển khoản &amp; tra cứu: <strong className="text-forest">#{order.public_code}</strong>
+          </p>
         </div>
         <span
           className={`inline-block px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.14em] shadow-sm ${currentStatusInfo.badgeClass}`}
@@ -168,7 +185,7 @@ export default async function OrderStatusPage({
           </p>
           {order.status === "awaiting_payment" && (
             <Link
-              href={`/payment/${order.id}`}
+              href={`/payment/${order.public_token}`}
               className="mt-3.5 inline-block bg-coral px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:bg-coral-hover hover:shadow-md"
             >
               Mở trang quét mã VietQR →
@@ -213,17 +230,17 @@ export default async function OrderStatusPage({
 
           <section className="border border-rule bg-white p-6 shadow-sm">
             <h2 className="border-b border-rule pb-3 font-display text-xl font-semibold text-forest">
-              Địa chỉ nhận cơm
+              Thông tin nhận cơm
             </h2>
             <div className="mt-3 space-y-2 text-sm text-muted">
               <p>
                 <strong className="text-ink font-semibold">{order.customer_name}</strong>{" "}
-                · <span className="font-mono text-forest font-semibold">{order.phone}</span>
+                · <span className="font-mono text-forest font-semibold">{maskPhone(order.phone)}</span>
               </p>
-              <p className="text-ink">{order.delivery_address}</p>
+              <p className="text-ink">{maskAddress(order.delivery_address)}</p>
               {order.customer_email && (
                 <p className="font-mono text-xs text-muted">
-                  Email: {order.customer_email}
+                  Thông báo: Đã liên kết email nhận thông báo
                 </p>
               )}
               {order.note && (

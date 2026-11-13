@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
 import { getOrderById, updateOrderStatusWithTimestamp } from "@/lib/orders-db";
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await isAdmin())) {
-    return NextResponse.json({ error: "Không có quyền truy cập." }, { status: 401 });
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminUnauthorizedError) {
+      return NextResponse.json({ error: "Yêu cầu quyền quản trị viên." }, { status: 401 });
+    }
+    return NextResponse.json({ error: "Lỗi xác thực." }, { status: 401 });
   }
 
   const { id } = await params;

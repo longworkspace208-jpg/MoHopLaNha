@@ -88,7 +88,7 @@ export default function CheckoutPage() {
       }
 
       clearCart();
-      router.push(`/payment/${data.orderId}`);
+      router.push(`/payment/${data.publicToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra.");
       setSubmitting(false);

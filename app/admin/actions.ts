@@ -1,9 +1,27 @@
 "use server";
-import { cookies } from "next/headers";
+
 import { redirect } from "next/navigation";
+import {
+  verifyAdminPasscode,
+  setAdminSessionCookie,
+  clearAdminSessionCookie,
+} from "@/lib/admin-auth";
+
 export async function adminLogin(formData: FormData) {
-  if (!process.env.ADMIN_PASSCODE) redirect("/admin/login?error=config");
-  if (formData.get("token") !== process.env.ADMIN_PASSCODE) redirect("/admin/login?error=1");
-  (await cookies()).set("mhln_admin", process.env.ADMIN_PASSCODE, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/" });
+  if (!process.env.ADMIN_PASSCODE) {
+    redirect("/admin/login?error=config");
+  }
+
+  const token = String(formData.get("token") ?? "");
+  if (!verifyAdminPasscode(token)) {
+    redirect("/admin/login?error=1");
+  }
+
+  await setAdminSessionCookie();
   redirect("/admin");
+}
+
+export async function adminLogout() {
+  await clearAdminSessionCookie();
+  redirect("/admin/login");
 }
