@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { OrderRecord } from "@/lib/types";
 import { formatVnd } from "@/lib/format";
@@ -103,14 +104,13 @@ export function PaymentView({
           </p>
 
           <div className="mx-auto mt-6 w-64 max-w-full border-2 border-forest bg-white p-3 shadow-inner">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={qrSvgUrl}
               alt={`Mã VietQR đơn hàng ${order.public_code}`}
+              width={224}
+              height={224}
+              unoptimized
               className="mx-auto h-56 w-56 max-w-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = vietQrImageUrl;
-              }}
             />
           </div>
 

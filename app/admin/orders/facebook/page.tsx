@@ -1,8 +1,20 @@
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/admin-auth";
 import { AdminNav } from "@/components/admin-nav";
-import { FacebookOrderForm } from "@/components/facebook-order-form";
+
+const FacebookOrderForm = nextDynamic(
+  () =>
+    import("@/components/facebook-order-form").then((m) => m.FacebookOrderForm),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải biểu mẫu tạo đơn…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import {
   getAllCookingBatches,
@@ -8,7 +9,18 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CookingBatch } from "@/lib/types";
 import { AdminNav } from "@/components/admin-nav";
-import { CookingBatchForm } from "@/components/cooking-batch-form";
+
+const CookingBatchForm = nextDynamic(
+  () =>
+    import("@/components/cooking-batch-form").then((m) => m.CookingBatchForm),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải biểu mẫu mẻ nấu…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

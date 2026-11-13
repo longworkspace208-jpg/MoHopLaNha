@@ -1,10 +1,21 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFallbackDishes, isSupabaseConfigured } from "@/lib/orders-db";
-import { MenuBuilder } from "@/components/menu-builder";
 import { AdminNav } from "@/components/admin-nav";
 import { publishDailyMenu, saveDailyMenu } from "./actions";
+
+const MenuBuilder = nextDynamic(
+  () => import("@/components/menu-builder").then((m) => m.MenuBuilder),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải công cụ thiết lập thực đơn…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

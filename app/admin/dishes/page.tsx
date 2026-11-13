@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -6,9 +7,19 @@ import {
   getFallbackIngredients,
   isSupabaseConfigured,
 } from "@/lib/orders-db";
-import { DishForm } from "@/components/dish-form";
 import { AdminNav } from "@/components/admin-nav";
 import { approveDish, createDish } from "./actions";
+
+const DishForm = nextDynamic(
+  () => import("@/components/dish-form").then((m) => m.DishForm),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải biểu mẫu món ăn…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

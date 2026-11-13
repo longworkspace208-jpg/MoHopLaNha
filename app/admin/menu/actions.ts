@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -152,6 +152,8 @@ export async function publishDailyMenu(formData: FormData) {
 
   const { error } = await db.from("menu_days").update({ published: true }).eq("id", day.id);
   if (error) throw new Error(error.message);
+  revalidateTag("menu");
   revalidatePath("/admin/menu");
   revalidatePath("/api/menu/today");
+  revalidatePath("/menu");
 }

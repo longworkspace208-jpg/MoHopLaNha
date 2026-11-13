@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
@@ -75,14 +76,15 @@ export function MealCustomizer() {
                   {line.dish.image_url ? (
                     line.dish.image_url.startsWith("http") ||
                     line.dish.image_url.startsWith("/") ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={line.dish.image_url}
-                          alt={line.dish.name}
-                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                        />
-                      </>
+                      <Image
+                        src={line.dish.image_url}
+                        alt={line.dish.name}
+                        width={64}
+                        height={64}
+                        sizes="64px"
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                      />
                     ) : (
                       <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
                     )

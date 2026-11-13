@@ -3,11 +3,11 @@ import { getOrderById, getOrderByPublicToken, updateOrderStatus } from "@/lib/or
 
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const { id } = await params;
-    const order = (await getOrderByPublicToken(id)) ?? (await getOrderById(id));
+    const { token } = await params;
+    const order = (await getOrderByPublicToken(token)) ?? (await getOrderById(token));
 
     if (!order) {
       return NextResponse.json(

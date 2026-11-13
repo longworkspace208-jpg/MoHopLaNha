@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "@/lib/admin-auth";
 import { getOrderById, getPortionsByOrder } from "@/lib/orders-db";
@@ -74,10 +75,12 @@ export default async function AdminOrderLabelsPage({
                 <p className="text-xs font-extrabold uppercase tracking-widest text-brand-700">
                   Mở Hộp Là Nhà
                 </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={qrSrc}
                   alt={`QR ${portion.qrCode}`}
+                  width={144}
+                  height={144}
+                  unoptimized
                   className="mx-auto my-2 h-36 w-36 rounded-lg bg-white p-1"
                 />
                 <h2 className="text-base font-black text-brand-950">

@@ -1,9 +1,26 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import { getAllOrders } from "@/lib/orders-db";
 import { AdminNav } from "@/components/admin-nav";
-import { AdminOrdersBoard } from "@/components/admin-orders-board";
-import { CollapsibleFacebookOrder } from "@/components/collapsible-facebook-order";
+
+const AdminOrdersBoard = nextDynamic(
+  () => import("@/components/admin-orders-board").then((m) => m.AdminOrdersBoard),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải bảng đơn hàng…
+      </div>
+    ),
+  }
+);
+
+const CollapsibleFacebookOrder = nextDynamic(
+  () =>
+    import("@/components/collapsible-facebook-order").then(
+      (m) => m.CollapsibleFacebookOrder
+    )
+);
 
 export const dynamic = "force-dynamic";
 

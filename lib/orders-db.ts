@@ -713,7 +713,7 @@ export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]
       const supabase = createServerSupabaseClient();
       let query = supabase
         .from("orders")
-        .select("*")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
         .order("created_at", { ascending: false });
 
       if (normalizedFilter) {
@@ -726,7 +726,7 @@ export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]
         const orderIds = orders.map((o) => o.id);
         const { data: items } = await supabase
           .from("order_items")
-          .select("*")
+          .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
           .in("order_id", orderIds);
 
         const itemsByOrder = new Map<string, DbOrderItemRow[]>();
@@ -762,8 +762,15 @@ export async function getOrderById(orderId: string): Promise<OrderRecord | null>
     try {
       const supabase = createServerSupabaseClient();
       const [{ data: order }, { data: items }] = await Promise.all([
-        supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
-        supabase.from("order_items").select("*").eq("order_id", orderId)
+        supabase
+          .from("orders")
+          .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
+          .eq("id", orderId)
+          .maybeSingle(),
+        supabase
+          .from("order_items")
+          .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
+          .eq("order_id", orderId),
       ]);
 
       if (order) {
@@ -787,14 +794,14 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
       const supabase = createServerSupabaseClient();
       const { data: order } = await supabase
         .from("orders")
-        .select("*")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
         .eq("public_code", code)
         .maybeSingle();
 
       if (order) {
         const { data: items } = await supabase
           .from("order_items")
-          .select("*")
+          .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
           .eq("order_id", order.id);
 
         return mapOrderRow(order as DbOrderRow, (items ?? []) as DbOrderItemRow[]);
@@ -820,14 +827,14 @@ export async function getOrderByPublicToken(token: string): Promise<OrderRecord 
       const supabase = createServerSupabaseClient();
       const { data: order } = await supabase
         .from("orders")
-        .select("*")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
         .eq("public_token", token)
         .maybeSingle();
 
       if (order) {
         const { data: items } = await supabase
           .from("order_items")
-          .select("*")
+          .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
           .eq("order_id", order.id);
 
         return mapOrderRow(order as DbOrderRow, (items ?? []) as DbOrderItemRow[]);

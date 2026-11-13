@@ -1,4 +1,3 @@
-import QRCode from "qrcode";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -8,16 +7,17 @@ export async function GET(request: Request) {
   }
 
   try {
+    const QRCode = (await import("qrcode")).default;
     const svg = await QRCode.toString(data, {
       type: "svg",
       margin: 1,
-      errorCorrectionLevel: "M"
+      errorCorrectionLevel: "M",
     });
     return new NextResponse(svg, {
       headers: {
         "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=3600"
-      }
+        "Cache-Control": "public, max-age=3600",
+      },
     });
   } catch {
     return new NextResponse("Không thể tạo mã QR", { status: 500 });

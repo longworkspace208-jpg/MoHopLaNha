@@ -206,3 +206,12 @@ create policy "anon_select_published_combo_items"
         and public.menu_days.published = true
     )
   );
+
+-- Performance Indexes (Migration 003)
+CREATE INDEX IF NOT EXISTS idx_orders_status_created_at ON public.orders(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_public_token ON public.orders(public_token);
+CREATE INDEX IF NOT EXISTS idx_orders_public_code ON public.orders(public_code);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_menu_dishes_menu_day_id ON public.menu_dishes(menu_day_id);
+CREATE INDEX IF NOT EXISTS idx_combos_menu_day_id ON public.combos(menu_day_id);
+CREATE INDEX IF NOT EXISTS idx_combo_items_combo_id ON public.combo_items(combo_id);

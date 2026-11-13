@@ -12,7 +12,7 @@ import {
   type RetentionDishItem,
 } from "@/components/home-retention-section";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
 const HERO_DISH_META: Record<
   string,

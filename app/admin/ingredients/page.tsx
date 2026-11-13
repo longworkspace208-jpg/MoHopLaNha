@@ -1,9 +1,21 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFallbackIngredients, isSupabaseConfigured } from "@/lib/orders-db";
-import { IngredientManager } from "@/components/ingredient-manager";
 import { AdminNav } from "@/components/admin-nav";
+
+const IngredientManager = nextDynamic(
+  () =>
+    import("@/components/ingredient-manager").then((m) => m.IngredientManager),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải quản lý nguyên liệu…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

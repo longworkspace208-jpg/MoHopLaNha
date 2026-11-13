@@ -196,6 +196,8 @@ export function HeroSection({ dishes }: HeroSectionProps) {
                 width={700}
                 height={700}
                 priority
+                fetchPriority="high"
+                sizes="(max-width: 640px) 256px, (max-width: 1024px) 320px, 450px"
                 className="h-full w-full scale-[1.24] object-cover"
               />
             </div>
@@ -358,6 +360,8 @@ export function HeroSection({ dishes }: HeroSectionProps) {
                       alt={item.shortName}
                       width={140}
                       height={140}
+                      sizes="64px"
+                      loading="lazy"
                       className="h-full w-full scale-[1.24] object-cover"
                     />
                   </div>

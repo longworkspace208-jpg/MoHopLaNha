@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { isAdmin } from "@/lib/admin-auth";
 import {
   getAllCookingBatches,
@@ -8,7 +9,17 @@ import {
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CookingBatch } from "@/lib/types";
 import { AdminNav } from "@/components/admin-nav";
-import { PackForm } from "@/components/pack-form";
+
+const PackForm = nextDynamic(
+  () => import("@/components/pack-form").then((m) => m.PackForm),
+  {
+    loading: () => (
+      <div className="p-8 text-center text-sm text-slate-500">
+        Đang tải biểu mẫu đóng gói…
+      </div>
+    ),
+  }
+);
 
 export const dynamic = "force-dynamic";
 

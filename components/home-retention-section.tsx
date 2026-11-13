@@ -237,6 +237,8 @@ export function HomeGoalShowcase({ dishes }: { dishes: RetentionDishItem[] }) {
                         alt={dish.name}
                         width={640}
                         height={480}
+                        sizes="(max-width: 640px) 84vw, (max-width: 1024px) 360px, 33vw"
+                        loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <span className="absolute left-2.5 top-2.5 rounded-sm bg-forest/90 px-2.5 py-1 font-mono text-[11px] font-bold tracking-wider text-white">

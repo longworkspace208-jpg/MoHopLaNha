@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import type { TodayMenu } from "@/lib/customer-menu";
 import { useCartStore } from "@/lib/cart-store";
@@ -13,9 +14,13 @@ const label = {
   protein: "Nhiều protein",
 };
 
-export function CustomerMenu() {
-  const [menu, setMenu] = useState<TodayMenu | null>(null);
-  const [loading, setLoading] = useState(true);
+export function CustomerMenu({
+  initialMenu,
+}: {
+  initialMenu?: TodayMenu | null;
+}) {
+  const [menu, setMenu] = useState<TodayMenu | null>(initialMenu ?? null);
+  const [loading, setLoading] = useState(!initialMenu);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
 
@@ -26,10 +31,12 @@ export function CustomerMenu() {
   const addDish = useCartStore((state) => state.addDish);
 
   const loadMenu = useCallback(async () => {
-    setLoading(true);
+    if (!initialMenu) setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/menu/today", { cache: "no-store" });
+      const res = await fetch("/api/menu/today", {
+        next: { tags: ["menu"] },
+      });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Hôm nay chưa có thực đơn được công bố.");
@@ -44,11 +51,13 @@ export function CustomerMenu() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [initialMenu]);
 
   useEffect(() => {
-    loadMenu();
-  }, [loadMenu]);
+    if (!initialMenu) {
+      loadMenu();
+    }
+  }, [initialMenu, loadMenu]);
 
   if (loading) {
     return (
@@ -286,14 +295,15 @@ export function CustomerMenu() {
                         {dish.image_url ? (
                           dish.image_url.startsWith("http") ||
                           dish.image_url.startsWith("/") ? (
-                            <>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={dish.image_url}
-                                alt={dish.name}
-                                className="h-full w-full object-cover"
-                              />
-                            </>
+                            <Image
+                              src={dish.image_url}
+                              alt={dish.name}
+                              width={80}
+                              height={80}
+                              sizes="(max-width: 640px) 64px, 80px"
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                            />
                           ) : (
                             <span className="grid h-full w-full place-items-center font-mono text-xs text-white">
                               MÓN
