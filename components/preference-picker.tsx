@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cart-store";
 import type { Goal } from "@/lib/customer-menu";
@@ -31,8 +32,21 @@ export function PreferencePicker() {
   const router = useRouter();
   const people = useCartStore((state) => state.people);
   const goal = useCartStore((state) => state.goal);
+  const lines = useCartStore((state) => state.lines);
   const setPeople = useCartStore((state) => state.setPeople);
   const setGoal = useCartStore((state) => state.setGoal);
+
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+  const handleSelectPeople = (count: number) => {
+    if (count === people) return;
+    const hasCustom = lines.some((l) => l.customEdited);
+    if (hasCustom) {
+      setPendingCount(count);
+    } else {
+      setPeople(count, true);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -55,7 +69,7 @@ export function PreferencePicker() {
                 key={count}
                 type="button"
                 aria-pressed={active}
-                onClick={() => setPeople(count)}
+                onClick={() => handleSelectPeople(count)}
                 className={`flex min-h-[50px] items-center justify-center rounded-sm font-mono text-base font-bold transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral ${
                   active
                     ? "bg-coral text-white shadow-md ring-2 ring-white/80"
@@ -67,6 +81,40 @@ export function PreferencePicker() {
             );
           })}
         </div>
+
+        {/* Hộp thoại hỏi ý kiến nếu khách đã sửa tay gram */}
+        {pendingCount !== null && (
+          <div className="mt-3 rounded border border-coral/40 bg-coral/10 p-3.5 text-xs text-white">
+            <p className="font-bold text-coral">Cập nhật lại theo gợi ý mới?</p>
+            <p className="mt-1 text-ivory/90 leading-relaxed">
+              Bạn đã tùy chỉnh lượng gram cho món trong khay. Bạn muốn tính lại
+              định lượng theo gợi ý chuẩn cho {pendingCount} người hay giữ
+              nguyên số gram đã chỉnh tay?
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPeople(pendingCount, true);
+                  setPendingCount(null);
+                }}
+                className="rounded bg-coral px-3 py-1.5 font-mono text-[11px] font-bold text-white shadow hover:bg-coral-hover"
+              >
+                Cập nhật theo gợi ý mới
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPeople(pendingCount, false);
+                  setPendingCount(null);
+                }}
+                className="rounded border border-white/30 bg-white/10 px-3 py-1.5 font-mono text-[11px] font-bold text-white hover:bg-white/20"
+              >
+                Giữ nguyên lượng đã chỉnh
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bước 2: Chọn mục tiêu dinh dưỡng */}

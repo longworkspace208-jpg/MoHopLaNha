@@ -13,6 +13,7 @@ export default function CheckoutPage() {
   const [mounted, setMounted] = useState(false);
 
   const people = useCartStore((state) => state.people);
+  const goal = useCartStore((state) => state.goal);
   const lines = useCartStore((state) => state.lines);
   const clearCart = useCartStore((state) => state.clearCart);
 
@@ -33,11 +34,10 @@ export default function CheckoutPage() {
 
   const subtotal = useMemo(() => {
     return lines.reduce((sum, line) => {
-      const totalGrams = line.gramsPerPerson * people;
-      const price = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
+      const price = (line.dish.price_vnd / line.dish.yield_g) * line.grams;
       return sum + price;
     }, 0);
-  }, [lines, people]);
+  }, [lines]);
 
   const shippingFee = lines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
   const total = subtotal + shippingFee;
@@ -78,9 +78,11 @@ export default function CheckoutPage() {
         email: email.trim() || undefined,
         note: note.trim() || undefined,
         turnstileToken: turnstileToken,
+        people: people,
+        goal: goal,
         lines: lines.map((line) => ({
           dishId: line.dish.id,
-          grams: line.gramsPerPerson * people,
+          grams: line.grams,
         })),
       };
 
@@ -297,7 +299,7 @@ export default function CheckoutPage() {
 
             <div className="divide-y divide-white/10">
               {lines.map((line) => {
-                const itemGrams = line.gramsPerPerson * people;
+                const itemGrams = line.grams;
                 const itemPrice = Math.round(
                   (line.dish.price_vnd / line.dish.yield_g) * itemGrams
                 );
@@ -324,7 +326,7 @@ export default function CheckoutPage() {
 
             <div className="mt-2 space-y-2.5 border-t border-white/15 pt-4 text-sm text-ivory/80">
               <div className="flex justify-between">
-                <span>Tạm tính ({people} người)</span>
+                <span>Tạm tính ({lines.length} món · bàn {people} người)</span>
                 <span className="font-mono font-bold tabular-nums text-white">
                   {formatVnd(Math.round(subtotal))}
                 </span>

@@ -176,6 +176,18 @@ export default async function PublicNutritionSnapshotPage({
                 </p>
               </div>
             </div>
+
+            {portion.people && portion.people > 1 && portion.per_person_estimate && (
+              <div className="mt-3 border-t border-rule pt-2.5 font-mono text-[11px] text-muted">
+                Bình quân mỗi người nếu chia đều ({portion.people} người):{" "}
+                <strong className="text-forest">
+                  {portion.per_person_estimate.kcal} kcal
+                </strong>{" "}
+                · P {portion.per_person_estimate.protein}g · C{" "}
+                {portion.per_person_estimate.carbs}g · F{" "}
+                {portion.per_person_estimate.fat}g (ước tính tham khảo)
+              </div>
+            )}
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-muted">

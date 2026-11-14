@@ -1,3 +1,4 @@
+export type { Macros } from "./nutrition";
 import type { Macros } from "./nutrition";
 
 export type Nutrition = Macros & { fiber: number };

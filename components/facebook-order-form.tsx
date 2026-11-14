@@ -226,6 +226,7 @@ export function FacebookOrderForm() {
         note: note.trim() || "Đơn Facebook: ",
         source: "facebook",
         overrideArea: !addressCheck.inService && overrideArea,
+        people: safePeople,
         lines: selectedLines.map((l) => ({
           dishId: l.dish.id,
           grams: l.totalGrams,

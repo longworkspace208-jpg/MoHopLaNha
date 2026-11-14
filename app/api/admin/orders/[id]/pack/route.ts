@@ -177,6 +177,12 @@ export async function POST(
       const sourceNote = portion.sourceNote ?? batch?.supplierNote ?? null;
       const lotCode = portion.lotCode ?? batch?.lotCode ?? null;
 
+      const orderPeople = Math.max(1, order.people ?? 1);
+      const perPersonEstimate = calculatePerPersonEstimate(
+        { kcal, protein: proteinG, carbs: carbsG, fat: fatG },
+        orderPeople
+      );
+
       const saved = await savePortionSnapshot({
         orderId: order.id,
         orderItemId: Number(item.id ?? idx + 1),
@@ -193,6 +199,8 @@ export async function POST(
         allergens,
         sourceNote,
         lotCode,
+        people: orderPeople,
+        per_person_estimate: perPersonEstimate,
         packedAt,
       });
 

@@ -8,9 +8,11 @@
  * - Trường `people` và `per_person_estimate` chỉ mang tính chất tham khảo cho người dùng/bếp.
  */
 
-import type { OrderRecord, OrderItemSnapshot, Macros } from "./types";
-import { SEED_INGREDIENTS } from "./nutrition";
+import type { OrderRecord, Macros } from "./types";
 import demoSeed from "./demo-seed.json";
+
+const SEED_INGREDIENTS: Record<string, { id: string; name: string; allergens: string[] }> =
+  Object.fromEntries(demoSeed.ingredients.map((i) => [i.id, i]));
 
 function round2(val: number): number {
   return Math.round(val * 100) / 100;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { TodayMenu } from "@/lib/customer-menu";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartStore, roundToStep } from "@/lib/cart-store";
 import { formatVnd } from "@/lib/format";
 import { MealCustomizer } from "./meal-customizer";
 
@@ -143,10 +143,20 @@ export function CustomerMenu({
     setActionError("");
     setGoal(combo.goal);
     setLines(
-      combo.items.map((item) => ({
-        dish: item.dish,
-        gramsPerPerson: item.grams,
-      }))
+      combo.items.map((item) => {
+        const suggested = roundToStep(item.grams * people, item.dish.step_g);
+        const clamped = Math.max(
+          item.dish.min_g,
+          Math.min(item.dish.max_g * people, suggested)
+        );
+        return {
+          dish: item.dish,
+          grams: clamped,
+          customEdited: false,
+          baseGrams: item.grams,
+          gramsPerPerson: item.grams,
+        };
+      })
     );
   };
 
@@ -160,7 +170,7 @@ export function CustomerMenu({
     }
     setActionError("");
     setGoal("custom");
-    addDish(dish);
+    addDish(dish, dish.min_g);
   };
 
   return (
@@ -176,7 +186,7 @@ export function CustomerMenu({
           </h1>
         </div>
         <p className="max-w-sm text-xs leading-relaxed text-muted sm:text-right">
-          Định lượng hiển thị theo từng người, tổng khối lượng và giá tự nhân theo số người bạn chọn.
+          Số người chỉ dùng để gợi ý khẩu phần mặc định. Bạn có thể tự do tăng giảm gram; giá và dinh dưỡng tính theo tổng gram bạn đặt.
         </p>
       </header>
 
@@ -257,7 +267,7 @@ export function CustomerMenu({
 
                       <p className="mt-2 text-sm leading-relaxed text-ink/80">
                         {combo.items
-                          .map((item) => `${item.dish.name} (${item.grams * people}g)`)
+                          .map((item) => `${item.dish.name} (gợi ý ${roundToStep(item.grams * people, item.dish.step_g)}g)`)
                           .join(" · ")}
                       </p>
                     </button>
@@ -333,7 +343,7 @@ export function CustomerMenu({
                         </div>
 
                         <p className="mt-1 font-mono text-xs text-muted">
-                          Từ {dish.min_g * people}g ·{" "}
+                          Tối thiểu từ {dish.min_g}g ·{" "}
                           <strong className="text-coral">
                             {formatVnd(dish.price_vnd)}
                           </strong>{" "}

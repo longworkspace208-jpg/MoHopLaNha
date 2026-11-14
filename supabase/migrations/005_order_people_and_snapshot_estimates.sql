@@ -9,3 +9,4 @@ alter table public.orders
 alter table public.nutrition_snapshots
   add column if not exists people integer default 1,
   add column if not exists per_person_estimate jsonb;
+

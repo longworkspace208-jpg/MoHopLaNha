@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartStore, roundToStep } from "@/lib/cart-store";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
 import { DELIVERY_CONFIG } from "@/lib/delivery-config";
@@ -33,15 +33,13 @@ export default function CartPage() {
   }
 
   const subtotal = lines.reduce((sum, line) => {
-    const totalGrams = line.gramsPerPerson * people;
-    const itemPrice = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
+    const itemPrice = (line.dish.price_vnd / line.dish.yield_g) * line.grams;
     return sum + itemPrice;
   }, 0);
 
   const totalNutrition = lines.reduce(
     (total, line) => {
-      const totalGrams = line.gramsPerPerson * people;
-      const macro = calcPortion(line.dish.nutrition_per100, totalGrams);
+      const macro = calcPortion(line.dish.nutrition_per100, line.grams);
       return {
         kcal: total.kcal + macro.kcal,
         protein: total.protein + macro.protein,
@@ -110,14 +108,20 @@ export default function CartPage() {
         {/* Cột trái: Danh sách món ngăn cách bởi hairline */}
         <section className="divide-y divide-rule border-b border-rule lg:col-span-7">
           {lines.map((line) => {
-            const totalGrams = line.gramsPerPerson * people;
-            const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
+            const grams = line.grams;
+            const suggestedGrams = roundToStep(
+              (line.baseGrams ?? line.dish.min_g) * people,
+              line.dish.step_g
+            );
+            const nutrition = calcPortion(line.dish.nutrition_per100, grams);
             const price = Math.round(
-              (line.dish.price_vnd / line.dish.yield_g) * totalGrams
+              (line.dish.price_vnd / line.dish.yield_g) * grams
             );
 
-            const canDecrease = line.gramsPerPerson > line.dish.min_g;
-            const canIncrease = line.gramsPerPerson < line.dish.max_g;
+            const minG = line.dish.min_g;
+            const maxG = line.dish.max_g * people;
+            const canDecrease = grams > minG;
+            const canIncrease = grams < maxG;
 
             return (
               <article key={line.dish.id} className="py-6 first:pt-0">
@@ -149,8 +153,10 @@ export default function CartPage() {
                         {line.dish.name}
                       </h2>
                       <p className="mt-1 font-mono text-xs text-muted">
-                        <strong className="text-forest font-semibold">{line.gramsPerPerson}g/người</strong> ·{" "}
-                        <span className="text-ink font-semibold">{totalGrams}g</span> cả bữa
+                        <strong className="text-forest font-semibold">{grams}g</strong> (tổng lượng đặt)
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                        Gợi ý cho {people} người: {suggestedGrams} g. Số gram ở đây là tổng lượng bạn đặt.
                       </p>
                       <p className="mt-1.5 font-mono text-base font-bold tabular-nums text-coral">
                         {formatVnd(price)}
@@ -185,7 +191,8 @@ export default function CartPage() {
                       onClick={() =>
                         changeGrams(
                           line.dish.id,
-                          line.gramsPerPerson - line.dish.step_g
+                          Math.max(minG, grams - line.dish.step_g),
+                          true
                         )
                       }
                       disabled={!canDecrease}
@@ -195,14 +202,15 @@ export default function CartPage() {
                       −
                     </button>
                     <span className="min-w-28 px-3 text-center font-mono text-xs font-bold tabular-nums text-ink">
-                      {line.gramsPerPerson}g / người
+                      {grams}g
                     </span>
                     <button
                       type="button"
                       onClick={() =>
                         changeGrams(
                           line.dish.id,
-                          line.gramsPerPerson + line.dish.step_g
+                          Math.min(maxG, grams + line.dish.step_g),
+                          true
                         )
                       }
                       disabled={!canIncrease}
@@ -223,7 +231,7 @@ export default function CartPage() {
           {/* Dinh dưỡng cả bữa */}
           <section className="border border-rule bg-white p-5 shadow-sm">
             <h3 className="border-b border-rule pb-2.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-forest">
-              Tổng dinh dưỡng cả bữa ({people} người · ước tính)
+              Tổng dinh dưỡng cả bữa (ước tính)
             </h3>
             <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2">
               <div>
@@ -259,6 +267,9 @@ export default function CartPage() {
                 </dd>
               </div>
             </dl>
+            <div className="mt-4 border-t border-rule pt-2.5 font-mono text-[11px] text-muted leading-relaxed">
+              Bình quân mỗi người nếu chia đều ({people} người): {formatVnd(Math.round(subtotal / people))} · {Math.round(totalNutrition.kcal / people)} kcal · P {(totalNutrition.protein / people).toFixed(1)}g (ước tính)
+            </div>
           </section>
 
           {/* Hóa đơn thanh toán Deep Forest Green */}

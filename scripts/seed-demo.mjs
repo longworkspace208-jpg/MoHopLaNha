@@ -96,6 +96,33 @@ async function seedSupabase() {
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
 
+  let orderProps = null;
+  let snapProps = null;
+  try {
+    const swaggerRes = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/?apikey=${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      { headers: { Accept: "application/openapi+json" } }
+    );
+    if (swaggerRes.ok) {
+      const swagger = await swaggerRes.json();
+      orderProps = swagger?.definitions?.orders?.properties || null;
+      snapProps = swagger?.definitions?.nutrition_snapshots?.properties || null;
+    }
+  } catch {
+    // ignore
+  }
+
+  function pickAvailable(payload, props) {
+    if (!props) return { ...payload };
+    const res = {};
+    for (const [k, v] of Object.entries(payload)) {
+      if (k in props) {
+        res[k] = v;
+      }
+    }
+    return res;
+  }
+
   const tablesToClear = [
     ["nutrition_snapshots", "id"],
     ["cooking_batches", "id"],
@@ -270,7 +297,7 @@ async function seedSupabase() {
     const deliveredAt =
       spec.status === "delivered" ? new Date(nowMs - 300_000).toISOString() : null;
 
-    const { error: ordErr } = await db.from("orders").insert({
+    const rawOrderPayload = {
       id: spec.id,
       public_token: spec.publicToken,
       public_code: spec.publicCode,
@@ -281,6 +308,8 @@ async function seedSupabase() {
       shipping_fee_vnd: SHIPPING_FEE_VND,
       note: spec.note,
       status: spec.status,
+      people: spec.people ?? 1,
+      goal: spec.goal ?? "balanced",
       total_vnd: subtotal + SHIPPING_FEE_VND,
       nutrition_snapshot: totalNutrition,
       created_at: createdAt,
@@ -288,7 +317,15 @@ async function seedSupabase() {
       cooking_at: cookingAt,
       packed_at: packedAt,
       delivered_at: deliveredAt
-    });
+    };
+    const orderPayload = pickAvailable(rawOrderPayload, orderProps);
+    let { error: ordErr } = await db.from("orders").insert(orderPayload);
+    if (ordErr && (ordErr.message.includes("'goal'") || ordErr.message.includes("'people'"))) {
+      delete orderPayload.goal;
+      delete orderPayload.people;
+      const retry = await db.from("orders").insert(orderPayload);
+      ordErr = retry.error;
+    }
     if (ordErr) throw new Error(`Lỗi seed order ${spec.publicCode}: ${ordErr.message}`);
 
     const { data: insertedItems, error: oiErr } = await db
@@ -322,7 +359,7 @@ async function seedSupabase() {
       });
       const allergens = Array.from(new Set(ingSnapshot.flatMap((i) => i.allergens)));
 
-      const { error: snapErr } = await db.from("nutrition_snapshots").insert({
+      const rawSnapPayload = {
         id: snap.id,
         order_id: spec.id,
         order_item_id: insertedItems[0].id,
@@ -339,8 +376,18 @@ async function seedSupabase() {
         allergens,
         source_note: snap.sourceNote,
         lot_code: snap.lotCode,
+        people: spec.people ?? 1,
+        per_person_estimate: snapMacros,
         packed_at: packedAt ?? createdAt
-      });
+      };
+      const snapPayload = pickAvailable(rawSnapPayload, snapProps);
+      let { error: snapErr } = await db.from("nutrition_snapshots").insert(snapPayload);
+      if (snapErr && (snapErr.message.includes("'people'") || snapErr.message.includes("'per_person_estimate'"))) {
+        delete snapPayload.people;
+        delete snapPayload.per_person_estimate;
+        const retry = await db.from("nutrition_snapshots").insert(snapPayload);
+        snapErr = retry.error;
+      }
       if (snapErr) throw new Error(`Lỗi seed nutrition_snapshots: ${snapErr.message}`);
     }
   }

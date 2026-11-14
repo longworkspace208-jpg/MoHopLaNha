@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartStore, roundToStep } from "@/lib/cart-store";
 
 export function MealCustomizer() {
   const people = useCartStore((state) => state.people);
@@ -13,7 +13,7 @@ export function MealCustomizer() {
 
   const totals = lines.reduce(
     (total, line) => {
-      const grams = line.gramsPerPerson * people;
+      const grams = line.grams;
       const nutrition = calcPortion(line.dish.nutrition_per100, grams);
       const price = (line.dish.price_vnd / line.dish.yield_g) * grams;
       return {
@@ -63,11 +63,17 @@ export function MealCustomizer() {
 
       <div className="divide-y divide-rule border-b border-rule">
         {lines.map((line) => {
-          const totalGrams = line.gramsPerPerson * people;
-          const nutrition = calcPortion(line.dish.nutrition_per100, totalGrams);
-          const price = (line.dish.price_vnd / line.dish.yield_g) * totalGrams;
-          const canDecrease = line.gramsPerPerson > line.dish.min_g;
-          const canIncrease = line.gramsPerPerson < line.dish.max_g;
+          const grams = line.grams;
+          const suggestedGrams = roundToStep(
+            (line.baseGrams ?? line.dish.min_g) * people,
+            line.dish.step_g
+          );
+          const nutrition = calcPortion(line.dish.nutrition_per100, grams);
+          const price = (line.dish.price_vnd / line.dish.yield_g) * grams;
+          const minG = line.dish.min_g;
+          const maxG = line.dish.max_g * people;
+          const canDecrease = grams > minG;
+          const canIncrease = grams < maxG;
 
           return (
             <article key={line.dish.id} className="py-4">
@@ -103,9 +109,12 @@ export function MealCustomizer() {
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-xs text-muted">
-                    <strong className="text-forest font-semibold">{line.gramsPerPerson}g/người</strong> · {totalGrams}g cả bữa
+                    <strong className="text-forest font-semibold">{grams}g</strong> (tổng lượng đặt)
                   </p>
-                  <p className="font-mono text-[11px] text-muted">
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                    Gợi ý cho {people} người: {suggestedGrams} g. Số gram ở đây là tổng lượng bạn đặt.
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted">
                     {Math.round(nutrition.kcal)} kcal · Protein {nutrition.protein.toFixed(1)}g
                   </p>
                 </div>
@@ -113,7 +122,7 @@ export function MealCustomizer() {
 
               <div className="mt-3.5 flex items-center justify-between">
                 <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-muted">
-                  Bước cân ±{line.dish.step_g}g
+                  Bước cân ±{line.dish.step_g}g (tối đa {maxG}g)
                 </span>
 
                 {/* Bộ điều khiển tăng giảm: tap target 40-44px, affordance rõ ràng */}
@@ -124,7 +133,8 @@ export function MealCustomizer() {
                     onClick={() =>
                       changeGrams(
                         line.dish.id,
-                        line.gramsPerPerson - line.dish.step_g
+                        Math.max(minG, grams - line.dish.step_g),
+                        true
                       )
                     }
                     disabled={!canDecrease}
@@ -133,7 +143,7 @@ export function MealCustomizer() {
                     −
                   </button>
                   <span className="min-w-20 px-2 text-center font-mono text-xs font-bold tabular-nums text-ink">
-                    {line.gramsPerPerson}g
+                    {grams}g
                   </span>
                   <button
                     type="button"
@@ -141,7 +151,8 @@ export function MealCustomizer() {
                     onClick={() =>
                       changeGrams(
                         line.dish.id,
-                        line.gramsPerPerson + line.dish.step_g
+                        Math.min(maxG, grams + line.dish.step_g),
+                        true
                       )
                     }
                     disabled={!canIncrease}
@@ -160,10 +171,10 @@ export function MealCustomizer() {
       <section className="bg-forest p-6 text-white shadow-sm">
         <div className="flex items-baseline justify-between border-b border-white/20 pb-3">
           <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-ivory/80">
-            Tạm tính · {people} người ăn
+            Tạm tính · {lines.length} món trong khay
           </span>
           <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-coral">
-            {lines.length} món đã chọn
+            Bàn {people} người
           </span>
         </div>
 
@@ -171,12 +182,12 @@ export function MealCustomizer() {
           {formatVnd(Math.round(totals.price))}
         </p>
         <p className="mt-1 font-mono text-xs text-ivory/90">
-          ≈ {Math.round(totals.kcal)} kcal · Protein {totals.protein.toFixed(1)}g (ước tính)
+          ≈ {Math.round(totals.kcal)} kcal · Protein {totals.protein.toFixed(1)}g (ước tính cả bữa)
         </p>
 
         <div className="mt-4 border-t border-white/15 pt-3 font-mono text-[11px] text-ivory/70">
-          Chia đều mỗi người: {formatVnd(Math.round(totals.price / people))} ·{" "}
-          {Math.round(totals.kcal / people)} kcal · P {(totals.protein / people).toFixed(1)}g
+          Bình quân mỗi người nếu chia đều: {formatVnd(Math.round(totals.price / people))} ·{" "}
+          {Math.round(totals.kcal / people)} kcal · P {(totals.protein / people).toFixed(1)}g (ước tính)
         </div>
 
         {/* Primary CTA Coral Orange */}
