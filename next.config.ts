@@ -5,8 +5,8 @@ const cspHeader = `
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://challenges.cloudflare.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com data:;
-  img-src 'self' data: blob: https://*.supabase.co https://img.vietqr.io https://images.unsplash.com https://*.unsplash.com;
-  connect-src 'self' https://*.supabase.co https://api.vietqr.io https://api.nal.usda.gov https://challenges.cloudflare.com;
+  img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.unsplash.com;
+  connect-src 'self' https://*.supabase.co https://api.nal.usda.gov https://challenges.cloudflare.com;
   frame-src https://challenges.cloudflare.com;
   frame-ancestors 'none';
   object-src 'none';
@@ -33,15 +33,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "img.vietqr.io",
-      },
-      {
-        protocol: "https",
         hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "api.vietqr.io",
       },
     ],
   },

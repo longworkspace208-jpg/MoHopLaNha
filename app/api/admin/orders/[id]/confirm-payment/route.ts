@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, AdminUnauthorizedError } from "@/lib/admin-auth";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { transitionOrderStatus } from "@/lib/orders-db";
+import type { OrderStatus } from "@/lib/types";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -16,27 +17,27 @@ export async function POST(
   }
 
   const { id } = await params;
-  try {
-    const { data, error } = await createServerSupabaseClient()
-      .from("orders")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", id)
-      .in("status", ["awaiting_payment", "pending_verification"])
-      .select("id")
-      .maybeSingle();
+  const body = await request.json().catch(() => ({}));
+  const isRestore = Boolean(body.restoreExpired);
 
-    if (error) throw error;
-    if (!data) {
-      return NextResponse.json(
-        { error: "Đơn không ở trạng thái chờ xác nhận thanh toán." },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ ok: true });
-  } catch (error) {
+  const expectedCurrentStatuses: OrderStatus[] = isRestore
+    ? ["cancelled"]
+    : ["awaiting_payment", "pending_verification"];
+
+  const result = await transitionOrderStatus(id, "paid", {
+    actor: "admin",
+    note: isRestore
+      ? "Khôi phục và xác nhận đã nhận tiền (đơn chuyển khoản trễ)"
+      : "Admin xác nhận đã nhận đủ tiền chuyển khoản",
+    expectedCurrentStatuses,
+  });
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Có lỗi máy chủ." },
-      { status: 500 }
+      { error: result.error ?? "Không thể xác nhận thanh toán đơn hàng." },
+      { status: result.conflict ? 409 : 400 }
     );
   }
+
+  return NextResponse.json({ ok: true, order: result.order });
 }

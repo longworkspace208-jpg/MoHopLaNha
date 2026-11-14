@@ -7,7 +7,7 @@ import {
   updateOrderStatus
 } from "./orders-db";
 import { validateServiceArea, DELIVERY_CONFIG } from "./delivery-config";
-import { generateVietQrPayload, getVietQrImageUrl } from "./bank-config";
+import { getBankConfig } from "./bank-config";
 
 describe("End-to-End Order & Payment Flow", () => {
   it("validates address service area correctly", () => {
@@ -65,11 +65,10 @@ describe("End-to-End Order & Payment Flow", () => {
     expect(order?.items).toHaveLength(1);
     expect(order?.items[0].grams).toBe(350);
 
-    // VietQR Payload & Image check
-    const vietQrUrl = getVietQrImageUrl(order!.total_vnd, order!.public_code);
-    expect(vietQrUrl).toContain(publicCode);
-    const emvCo = generateVietQrPayload(order!.total_vnd, order!.public_code);
-    expect(emvCo).toContain(publicCode);
+    // Cấu hình ngân hàng & hạn thanh toán
+    const bankConfig = getBankConfig();
+    expect(bankConfig.bankName).toBeDefined();
+    expect(order?.expires_at).toBeDefined();
   });
 
   it("updates status to 'pending_verification' ONLY when customer clicks 'Tôi đã chuyển khoản'", async () => {

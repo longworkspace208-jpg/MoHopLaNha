@@ -146,10 +146,10 @@ describe("Ops Workflow Lifecycle (paid -> cooking -> packed -> delivered)", () =
       items: [{ dishId: "ga-nuong-com-gao-lut", grams: 350 }],
     });
 
-    // awaiting_payment -> paid directly is invalid
-    const directPaid = await updateOrderStatusWithTimestamp(orderId, "paid");
-    expect(directPaid.ok).toBe(false);
-    expect(directPaid.error).toBeTruthy();
+    // awaiting_payment -> cooking directly is invalid (must be paid first)
+    const directCooking = await updateOrderStatusWithTimestamp(orderId, "cooking");
+    expect(directCooking.ok).toBe(false);
+    expect(directCooking.error).toBeTruthy();
 
     // Walk up to packed
     expect(

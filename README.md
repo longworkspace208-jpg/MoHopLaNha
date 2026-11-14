@@ -57,12 +57,13 @@ Sao chép từ [`.env.example`](./.env.example) sang `.env.local` khi chạy loc
 | `SUPABASE_SERVICE_ROLE_KEY` | **Chỉ Server** | Khi dùng Supabase | Service role key dùng trong Route Handlers / Server Actions & `seed:demo` |
 | `USDA_API_KEY` | **Chỉ Server** | Tùy chọn | API key tra cứu nguyên liệu USDA FoodData Central (`/api/usda/search`) |
 | `ADMIN_PASSCODE` | **Chỉ Server** | **Bắt buộc cho `/admin`** | Mật khẩu đăng nhập trang quản trị `/admin/login` (lưu cookie `httpOnly` `mhln_admin`) |
-| `BANK_BIN` | Server | Khuyến nghị | Mã BIN ngân hàng theo chuẩn Napas/VietQR (vd: `970436`, `970415`, `970422`) |
-| `BANK_ACCOUNT` | Server | Khuyến nghị | Số tài khoản ngân hàng nhận tiền VietQR |
-| `BANK_ACCOUNT_NAME` | Server | Khuyến nghị | Tên chủ tài khoản (không dấu, viết hoa, vd: `MO HOP LA NHA`) |
+| `BANK_NAME` | **Chỉ Server** | Khuyến nghị | Tên ngân hàng nhận tiền chuyển khoản (vd: `Vietcombank`, `MB Bank`, `Techcombank`) |
+| `BANK_ACCOUNT_NO` | **Chỉ Server** | Khuyến nghị | Số tài khoản ngân hàng nhận tiền chuyển khoản (vd: `1024021346`) |
+| `BANK_ACCOUNT_HOLDER` | **Chỉ Server** | Khuyến nghị | Tên chủ tài khoản nhận tiền (vd: `THAI THI THUY TRANG`) |
+| `PAYMENT_WINDOW_MIN` | **Chỉ Server** | Tùy chọn (mặc định 60) | Thời hạn thanh toán cho đơn hàng tính theo phút |
 | `NEXT_PUBLIC_SITE_URL` | Client & Server | **Bắt buộc khi deploy** | URL gốc của website (vd: `https://your-app.vercel.app`) để sinh link QR trên tem nhãn `{SITE_URL}/n/{qr_code}` |
 
-> **Lưu ý bảo mật:** Không bao giờ gắn tiền tố `NEXT_PUBLIC_` cho `SUPABASE_SERVICE_ROLE_KEY`, `USDA_API_KEY` hay `ADMIN_PASSCODE`.
+> **Lưu ý bảo mật:** Không bao giờ gắn tiền tố `NEXT_PUBLIC_` cho `SUPABASE_SERVICE_ROLE_KEY`, `USDA_API_KEY`, `ADMIN_PASSCODE` hay các biến cấu hình ngân hàng `BANK_NAME`, `BANK_ACCOUNT_NO`, `BANK_ACCOUNT_HOLDER`. Không commit thông tin tài khoản thật vào repository công khai.
 
 ---
 
@@ -90,18 +91,24 @@ Lệnh này tạo sẵn **5 món ăn** (gồm món `"Bò áp chảo măng tây"`
 1. Bấm **"Tiến hành đặt hàng"** để vào `/checkout`.
 2. Nhập thử địa chỉ ngoài vùng (vd: `99 Cầu Giấy, Hà Nội`) để thấy cảnh báo đỏ **ngoài vùng phục vụ** và nút đặt đơn bị khóa.
 3. Đổi sang địa chỉ hợp lệ trong vùng phục vụ config (`lib/delivery-config.ts`), vd: `123 Lê Lợi, Bến Nghé, Quận 1`, nhập Họ tên + SĐT (`0901234567`).
-4. Bấm **"Đặt cơm & Nhận mã VietQR"** → Server tự tính lại giá & dinh dưỡng, tạo mã đơn `MHLN####` ở trạng thái `awaiting_payment`.
+4. Bấm **"Đặt cơm & Nhận thông tin chuyển khoản"** → Server tự tính lại giá & dinh dưỡng, tạo đơn hàng với `public_token` ngẫu nhiên và mã đối soát `MHLN####` ở trạng thái `awaiting_payment`, tự động chuyển hướng tới `/payment/[token]`.
 
-### Bước 4 — Thanh toán VietQR & theo dõi đơn (`/payment/[orderId]` & `/orders/[code]`)
-1. Trên `/payment/[orderId]`, kiểm tra mã VietQR, số tiền, nội dung chuyển khoản `MHLN####`, thử nút **Lưu mã QR** và **Sao chép thông tin**.
-2. Bấm **"Tôi đã chuyển khoản"** → Trạng thái chuyển sang **`pending_verification`** (chưa `paid`) và chuyển sang `/orders/MHLN####` để khách theo dõi.
+### Bước 4 — Chuyển khoản ngân hàng & theo dõi đơn (`/payment/[token]` & `/orders/[token]`)
+1. Trên `/payment/[token]`, hiển thị thẻ thông tin thanh toán trực tiếp: **Ngân hàng, Số tài khoản, Chủ tài khoản, Số tiền chính xác, Nội dung chuyển khoản** (`MHLN####`). Mỗi dòng đều có nút **Sao chép** tiện lợi.
+2. Trang có bộ đếm ngược thời gian giữ đơn (`PAYMENT_WINDOW_MIN`, mặc định 60 phút) và 3 bước hướng dẫn ngắn gọn bằng tiếng Việt.
+3. Khách có thể bấm **"Tôi đã chuyển khoản"** → Đơn chuyển sang **`pending_verification`** với thông báo _"Đã ghi nhận, bếp sẽ kiểm tra và xác nhận trong ít phút"_.
+4. Màn hình tự động cập nhật qua cơ chế polling 5 giây; ngay khi bếp/admin bấm xác nhận nhận tiền, giao diện tự động chuyển sang trang theo dõi đơn `/orders/[token]` mà khách không cần tải lại trang.
+5. Tại `/orders/[token]`, thanh tiến trình 5 bước trực quan: **Đặt đơn → Chuyển khoản → Bếp xác nhận → Đang chuẩn bị → Đã giao**. Khi đơn ở trạng thái `paid` hoặc `cooking`, tiến trình dừng ở mốc "Đang chuẩn bị".
 
-### Bước 5 — Quản trị xác nhận tiền, chế biến, đóng gói & in tem (`/admin`)
+### Bước 5 — Bếp/Admin đối soát & xác nhận đơn (`/admin`)
 1. Mở `/admin/login`, đăng nhập bằng `ADMIN_PASSCODE` đã cấu hình.
-2. Tại `/admin/orders`, lọc tab `pending_verification`, mở đơn vừa đặt và bấm **"Xác nhận đã nhận tiền"** → đơn chuyển **`paid`**.
-3. Mở `/admin/cooking`, tạo mẻ nấu mới (ghi nhận `lot_code`, nguồn gốc nguyên liệu, sản lượng nấu thực tế) và bấm **"Bắt đầu chế biến"** cho đơn (`paid` → **`cooking`**). (Ngoài ra có thể thử tạo đơn thủ công tại `/admin/orders/facebook`).
-4. Mở `/admin/orders/[id]/pack`, chọn mẻ nấu, điều chỉnh định lượng cân thực tế (gram) và bấm **"Xác nhận khẩu phần"** → hệ thống tạo `nutrition_snapshots` bất biến và chuyển đơn sang **`packed`**.
-5. Bấm **"In tem QR"** (`/admin/orders/[id]/labels`) để xem tem in có QR trỏ tới `{NEXT_PUBLIC_SITE_URL}/n/{qr_code}` và bấm **"Đã giao"** để hoàn tất **`delivered`**.
+2. Tại `/admin/orders`, tab **"Chờ xác nhận"** gom toàn bộ đơn `awaiting_payment` và `pending_verification` (các đơn khách đã bấm "Tôi đã chuyển khoản" được ưu tiên xếp lên đầu).
+3. Bấm **"Đã nhận tiền, bắt đầu chuẩn bị"** trên bất kỳ đơn nào (kể cả khách chưa bấm nút) → mở **hộp thoại đối chiếu** hiển thị rõ ràng **SỐ TIỀN** và **NỘI DUNG CHUYỂN KHOẢN** để nhân viên bếp kiểm tra với app ngân hàng trước khi xác nhận.
+4. Khi xác nhận, hệ thống kiểm tra chống trùng (optimistic lock, 409 nếu trạng thái đã đổi), chuyển trạng thái sang **`paid`**, lưu lịch sử kiểm toán vào `order_events` với `actor = 'admin'`.
+5. Đơn hàng `awaiting_payment` quá hạn sẽ tự động bị hủy (`cancel_reason = 'expired'`). Đơn `pending_verification` **tuyệt đối không bị tự hủy**. Nếu khách chuyển trễ khiến đơn bị hủy do hết hạn, admin có nút **"Khôi phục và xác nhận đã nhận tiền"** để kích hoạt lại đơn.
+6. Mở `/admin/cooking`, tạo mẻ nấu mới (ghi nhận `lot_code`, nguồn gốc nguyên liệu, sản lượng nấu thực tế) và bấm **"Bắt đầu chế biến"** cho đơn (`paid` → **`cooking`**). (Ngoài ra có thể thử tạo đơn thủ công tại `/admin/orders/facebook`).
+7. Mở `/admin/orders/[id]/pack`, chọn mẻ nấu, điều chỉnh định lượng cân thực tế (gram) và bấm **"Xác nhận khẩu phần"** → hệ thống tạo `nutrition_snapshots` bất biến và chuyển đơn sang **`packed`**.
+8. Bấm **"In tem QR"** (`/admin/orders/[id]/labels`) để xem tem in có QR trỏ tới `{NEXT_PUBLIC_SITE_URL}/n/{qr_code}` và bấm **"Đã giao"** để hoàn tất **`delivered`**.
 
 ### Bước 6 — Quét Nutrition QR công khai (`/n/[code]`)
 1. Mở trực tiếp URL trên tem QR (ví dụ `/n/MHLN1005-GA-001` hoặc mã suất vừa tạo ở Bước 5).

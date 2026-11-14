@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       source: String(body.source ?? "").trim() || undefined,
       overrideArea: Boolean(body.overrideArea),
       people: body.people !== undefined ? Number(body.people) : undefined,
+      goal: body.goal !== undefined ? String(body.goal).trim() : undefined,
       items: normalizedItems,
     };
 
@@ -152,6 +153,8 @@ export async function POST(request: Request) {
       note,
       items: validData.items,
       publicToken,
+      people: validData.people,
+      goal: validData.goal,
     });
 
     // Log bảo mật: tuyệt đối KHÔNG ghi SĐT, email hay địa chỉ vào log

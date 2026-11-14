@@ -5,6 +5,7 @@ import { orderStatusUpdateSchema, formatZodError } from "@/lib/validations";
 import type { OrderStatus } from "@/lib/types";
 
 const ADMIN_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
+  awaiting_payment: "paid",
   pending_verification: "paid",
   paid: "cooking",
   cooking: "packed",

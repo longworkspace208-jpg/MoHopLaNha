@@ -8,15 +8,16 @@ import { formatVnd } from "@/lib/format";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { AdminOrderActions } from "@/components/admin-order-actions";
 
-const FILTER_TABS: Array<{ key: "all" | OrderStatus; label: string }> = [
+type FilterKey = "all" | "pending_review" | OrderStatus;
+
+const FILTER_TABS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Tất cả" },
-  { key: "awaiting_payment", label: "awaiting_payment" },
-  { key: "pending_verification", label: "pending_verification" },
-  { key: "paid", label: "paid" },
-  { key: "cooking", label: "cooking" },
-  { key: "packed", label: "packed" },
-  { key: "delivered", label: "delivered" },
-  { key: "cancelled", label: "cancelled" },
+  { key: "pending_review", label: "Chờ xác nhận" },
+  { key: "paid", label: "Đã nhận đơn" },
+  { key: "cooking", label: "Đang chế biến" },
+  { key: "packed", label: "Đã đóng gói" },
+  { key: "delivered", label: "Đã giao" },
+  { key: "cancelled", label: "Đã hủy" },
 ];
 
 interface AdminOrdersBoardProps {
@@ -27,33 +28,51 @@ interface AdminOrdersBoardProps {
 export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const normalizedInitial =
-    initialStatus && FILTER_TABS.some((t) => t.key === initialStatus)
-      ? (initialStatus as "all" | OrderStatus)
-      : "all";
 
-  const [activeStatus, setActiveStatus] = useState<"all" | OrderStatus>(normalizedInitial);
+  const normalizedInitial: FilterKey =
+    initialStatus && FILTER_TABS.some((t) => t.key === initialStatus)
+      ? (initialStatus as FilterKey)
+      : initialStatus === "pending_verification" || initialStatus === "awaiting_payment"
+        ? "pending_review"
+        : "all";
+
+  const [activeStatus, setActiveStatus] = useState<FilterKey>(normalizedInitial);
 
   useEffect(() => {
     setActiveStatus(normalizedInitial);
   }, [normalizedInitial]);
 
-  const handleSelectTab = (tab: "all" | OrderStatus) => {
+  const handleSelectTab = (tab: FilterKey) => {
     setActiveStatus(tab);
-    const base = pathname || "/admin";
+    const base = pathname || "/admin/orders";
     const url = tab === "all" ? base : `${base}?status=${tab}`;
     router.replace(url, { scroll: false });
   };
 
-  const filteredOrders =
-    activeStatus === "all"
-      ? orders
-      : orders.filter((order) => order.status === activeStatus);
+  // Lọc và sắp xếp: với tab 'Chờ xác nhận', gom awaiting_payment và pending_verification,
+  // ưu tiên đưa đơn pending_verification lên đầu!
+  let filteredOrders = orders;
+  if (activeStatus === "pending_review") {
+    filteredOrders = orders
+      .filter((o) => o.status === "awaiting_payment" || o.status === "pending_verification")
+      .sort((a, b) => {
+        if (a.status === "pending_verification" && b.status !== "pending_verification") return -1;
+        if (b.status === "pending_verification" && a.status !== "pending_verification") return 1;
+        return b.created_at.localeCompare(a.created_at);
+      });
+  } else if (activeStatus !== "all") {
+    filteredOrders = orders.filter((order) => order.status === activeStatus);
+  }
 
-  const countByStatus = (status: "all" | OrderStatus) =>
-    status === "all"
-      ? orders.length
-      : orders.filter((o) => o.status === status).length;
+  const countByStatus = (statusKey: FilterKey) => {
+    if (statusKey === "all") return orders.length;
+    if (statusKey === "pending_review") {
+      return orders.filter(
+        (o) => o.status === "awaiting_payment" || o.status === "pending_verification"
+      ).length;
+    }
+    return orders.filter((o) => o.status === statusKey).length;
+  };
 
   return (
     <div>
@@ -68,8 +87,8 @@ export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProp
                 onClick={() => handleSelectTab(tab.key)}
                 className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                   isActive
-                    ? "bg-brand-950 text-white shadow-sm"
-                    : "bg-white text-slate-700 shadow-sm hover:bg-brand-50"
+                    ? "bg-forest text-white shadow-sm"
+                    : "bg-white text-slate-700 shadow-sm hover:bg-forest/10"
                 }`}
               >
                 {tab.label} ({countByStatus(tab.key)})
@@ -89,7 +108,11 @@ export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProp
         {filteredOrders.map((order) => (
           <article
             key={order.id}
-            className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 transition hover:ring-brand-200"
+            className={`rounded-2xl bg-white p-4 shadow-sm ring-1 transition hover:ring-brand-200 ${
+              order.status === "pending_verification"
+                ? "border-l-4 border-coral ring-coral/20 bg-coral/5"
+                : "ring-slate-100"
+            }`}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1.5">
@@ -110,6 +133,16 @@ export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProp
                   <span className="font-bold text-brand-700">
                     {formatVnd(order.total_vnd)}
                   </span>
+                  {order.status === "pending_verification" && (
+                    <span className="rounded-sm bg-coral px-2 py-0.5 font-mono text-[10px] font-bold text-white">
+                      Khách đã báo chuyển
+                    </span>
+                  )}
+                  {order.cancel_reason === "expired" && (
+                    <span className="rounded-sm bg-rose-100 px-2 py-0.5 font-mono text-[10px] font-bold text-rose-700">
+                      Hết hạn 60p
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-slate-800">
                   {order.customer_name} · {order.phone} ·{" "}
@@ -121,12 +154,14 @@ export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProp
                   <Link href={`/admin/orders/${order.id}`} className="hover:underline">
                     Chi tiết đơn →
                   </Link>
-                  {order.status === "awaiting_payment" && (
+                  {(order.status === "awaiting_payment" ||
+                    order.status === "pending_verification") && (
                     <Link
-                      href={`/payment/${order.id}`}
+                      href={`/payment/${order.public_token}`}
+                      target="_blank"
                       className="text-amber-700 hover:underline"
                     >
-                      Link thanh toán VietQR →
+                      Trang thanh toán khách →
                     </Link>
                   )}
                   {order.status === "cooking" && (
@@ -148,7 +183,13 @@ export function AdminOrdersBoard({ orders, initialStatus }: AdminOrdersBoardProp
                 </div>
               </div>
 
-              <AdminOrderActions id={order.id} status={order.status} />
+              <AdminOrderActions
+                id={order.id}
+                status={order.status}
+                totalVnd={order.total_vnd}
+                publicCode={order.public_code}
+                cancelReason={order.cancel_reason}
+              />
             </div>
           </article>
         ))}

@@ -11,6 +11,7 @@ import {
 } from "@/lib/orders-db";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CookingBatch, PortionSnapshot } from "@/lib/types";
+import { calculatePerPersonEstimate } from "@/lib/production";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

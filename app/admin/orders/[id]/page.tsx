@@ -70,7 +70,13 @@ export default async function AdminOrderDetailPage({
               {new Date(order.created_at).toLocaleString("vi-VN")}
             </p>
           </div>
-          <AdminOrderActions id={order.id} status={order.status} />
+          <AdminOrderActions
+            id={order.id}
+            status={order.status}
+            totalVnd={order.total_vnd}
+            publicCode={order.public_code}
+            cancelReason={order.cancel_reason}
+          />
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">

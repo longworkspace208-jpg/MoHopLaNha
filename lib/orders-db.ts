@@ -3,8 +3,10 @@ import path from "node:path";
 import { nanoid } from "nanoid";
 import { createServerSupabaseClient } from "./supabase/server";
 import { calcDish, calcPortion, type Macros } from "./nutrition";
-import type { CookingBatch, OrderItemSnapshot, OrderRecord, OrderStatus, PortionSnapshot } from "./types";
+import type { CookingBatch, OrderEvent, OrderItemSnapshot, OrderRecord, OrderStatus, PortionSnapshot } from "./types";
 import { DELIVERY_CONFIG } from "./delivery-config";
+import { getBankConfig } from "./bank-config";
+import { validateGramsForDish } from "./validations";
 import demoSeed from "./demo-seed.json";
 
 export class OutOfStockError extends Error {
@@ -26,6 +28,8 @@ export type OrderCreationInput = {
   customerEmail?: string | null;
   note?: string | null;
   items: OrderCreationItem[];
+  people?: number;
+  goal?: string | null;
 };
 
 // ==========================================
@@ -128,6 +132,7 @@ function buildFallbackDishes(): FallbackDish[] {
 const globalFallback = globalThis as unknown as {
   _fallbackDishes?: FallbackDish[];
   _fallbackOrders?: Map<string, OrderRecord>;
+  _fallbackOrderEvents?: OrderEvent[];
   _fallbackDemoSeedMarker?: string;
 };
 
@@ -201,6 +206,12 @@ export function resetFallbackDemoData(): void {
       : null;
     const deliveredAt = status === "delivered" ? new Date(nowMs - 300_000).toISOString() : null;
 
+    const expiresAt =
+      status === "cancelled"
+        ? new Date(orderTimeMs).toISOString()
+        : new Date(nowMs + 60 * 60 * 1000).toISOString();
+    const cancelReason = status === "cancelled" ? "expired" : null;
+
     orders.set(spec.id, {
       id: spec.id,
       public_token: (spec as { publicToken?: string }).publicToken || `tok_demo_${spec.publicCode.toLowerCase()}`,
@@ -215,8 +226,12 @@ export function resetFallbackDemoData(): void {
       shipping_fee_vnd: DELIVERY_CONFIG.shippingFeeVnd,
       total_vnd: subtotal + DELIVERY_CONFIG.shippingFeeVnd,
       nutrition_snapshot: totalNutrition,
+      people: (spec as { people?: number }).people ?? 1,
+      goal: (spec as { goal?: string }).goal ?? "balanced",
       items,
       created_at: createdAt,
+      expires_at: expiresAt,
+      cancel_reason: cancelReason,
       paid_at: paidAt,
       cooking_at: cookingAt,
       packed_at: packedAt,
@@ -253,6 +268,13 @@ export function resetFallbackDemoData(): void {
         allergens,
         sourceNote: snap.sourceNote,
         lotCode: snap.lotCode,
+        people: 1,
+        per_person_estimate: {
+          kcal: Number(snapNutrition.kcal.toFixed(2)),
+          protein: Number(snapNutrition.protein.toFixed(2)),
+          carbs: Number(snapNutrition.carbs.toFixed(2)),
+          fat: Number(snapNutrition.fat.toFixed(2))
+        },
         packedAt: packedAt ?? createdAt
       });
     }
@@ -260,6 +282,7 @@ export function resetFallbackDemoData(): void {
 
   globalFallback._fallbackDishes = dishes;
   globalFallback._fallbackOrders = orders;
+  globalFallback._fallbackOrderEvents = [];
   globalFallbackBatches._fallbackBatches = batches;
   globalFallbackBatches._fallbackPortions = portions;
 }
@@ -404,15 +427,17 @@ async function getSupabaseTodayMenuLimits(dishIds: string[]): Promise<Map<string
 /**
  * Tính toán lại giá và dinh dưỡng từ Database hoặc Fallback
  */
-export async function calculateOrderFromDb(items: OrderCreationItem[]) {
+export async function calculateOrderFromDb(items: OrderCreationItem[], people: number = 1) {
   if (!items || items.length === 0) {
     throw new Error("Đơn hàng không có món nào.");
   }
 
   ensureDemoSeedLoaded();
+  const safePeople = Math.max(1, Math.min(10, Math.round(people || 1)));
   const calculatedItems: OrderItemSnapshot[] = [];
   const totalNutrition: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
   let subtotal = 0;
+  const fallbackDishes = getFallbackDishes();
 
   if (isSupabaseConfigured()) {
     try {
@@ -444,14 +469,17 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
         if (!Number.isFinite(reqItem.grams) || reqItem.grams <= 0) {
           throw new Error(`Khối lượng phần ăn ${dish.name} không hợp lệ.`);
         }
-        if (reqItem.grams < 50) {
-          throw new Error(`Định lượng món "${dish.name}" tối thiểu là 50g.`);
-        }
-        if (reqItem.grams > 2000) {
-          throw new Error(`Định lượng món "${dish.name}" tối đa là 2,000g.`);
-        }
-        if (reqItem.grams % 10 !== 0) {
-          throw new Error(`Định lượng món "${dish.name}" (${reqItem.grams}g) phải là bội số của 10g.`);
+
+        const fallbackDish = fallbackDishes.find((d) => d.id === dish.id);
+        const meta = {
+          name: dish.name,
+          min_g: fallbackDish?.min_g ?? 50,
+          max_g: fallbackDish?.max_g ?? 250,
+          step_g: fallbackDish?.step_g ?? 10,
+        };
+        const valCheck = validateGramsForDish(meta, reqItem.grams, safePeople);
+        if (!valCheck.valid) {
+          throw new Error(valCheck.error);
         }
 
         const ingredientsForDish = (recipeRows ?? [])
@@ -504,7 +532,6 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
   // ==========================================
   // FALLBACK CALCULATION KHI CHƯA CÓ SUPABASE
   // ==========================================
-  const fallbackDishes = getFallbackDishes();
   const orderedCounts = getFallbackTodayOrderedCounts();
 
   for (const reqItem of items) {
@@ -519,14 +546,10 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
     if (!Number.isFinite(reqItem.grams) || reqItem.grams <= 0) {
       throw new Error(`Khối lượng phần ăn ${dish.name} không hợp lệ.`);
     }
-    if (dish.min_g && reqItem.grams < dish.min_g) {
-      throw new Error(`Định lượng món "${dish.name}" tối thiểu là ${dish.min_g}g.`);
-    }
-    if (dish.max_g && reqItem.grams > dish.max_g) {
-      throw new Error(`Định lượng món "${dish.name}" tối đa là ${dish.max_g}g.`);
-    }
-    if (dish.step_g && reqItem.grams % dish.step_g !== 0 && (reqItem.grams - dish.min_g) % dish.step_g !== 0) {
-      throw new Error(`Định lượng món "${dish.name}" (${reqItem.grams}g) phải là bội số của ${dish.step_g}g.`);
+
+    const valCheck = validateGramsForDish(dish, reqItem.grams, safePeople);
+    if (!valCheck.valid) {
+      throw new Error(valCheck.error);
     }
 
     const portionNutrition = calcPortion(dish.nutrition_per100, reqItem.grams);
@@ -559,11 +582,14 @@ export async function calculateOrderFromDb(items: OrderCreationItem[]) {
 /**
  * Tạo đơn hàng mới trong DB / Fallback
  */
-export async function createOrderInDb(input: OrderCreationInput & { publicToken?: string }): Promise<{ orderId: string; publicCode: string; publicToken: string }> {
-  const calculated = await calculateOrderFromDb(input.items);
+export async function createOrderInDb(input: OrderCreationInput & { publicToken?: string }): Promise<{ orderId: string; publicCode: string; publicToken: string; expiresAt: string }> {
+  const safePeople = Math.max(1, Math.min(10, Math.round(input.people ?? 1)));
+  const calculated = await calculateOrderFromDb(input.items, safePeople);
   const publicCode = await generateUniqueOrderCode();
   const orderId = crypto.randomUUID();
   const publicToken = input.publicToken || nanoid(21);
+  const paymentWindowMin = getBankConfig().paymentWindowMin;
+  const expiresAt = new Date(Date.now() + paymentWindowMin * 60 * 1000).toISOString();
 
   if (isSupabaseConfigured()) {
     try {
@@ -582,9 +608,12 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
           status: "awaiting_payment",
           shipping_fee_vnd: calculated.shippingFee,
           total_vnd: calculated.total,
-          nutrition_snapshot: calculated.nutrition
+          nutrition_snapshot: calculated.nutrition,
+          people: safePeople,
+          goal: input.goal || null,
+          expires_at: expiresAt,
         })
-        .select("id, public_code, public_token")
+        .select("id, public_code, public_token, expires_at")
         .single();
 
       if (orderError || !order) {
@@ -610,7 +639,8 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
         throw new Error(itemsError.message);
       }
 
-      return { orderId: order.id, publicCode: order.public_code, publicToken: order.public_token || publicToken };
+      await recordOrderEvent(order.id, null, "awaiting_payment", "customer", "Khách tạo đơn hàng");
+      return { orderId: order.id, publicCode: order.public_code, publicToken: order.public_token || publicToken, expiresAt };
     } catch (err) {
       console.warn("Supabase order creation failed, persisting to fallback:", err);
     }
@@ -631,12 +661,21 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
     shipping_fee_vnd: calculated.shippingFee,
     total_vnd: calculated.total,
     nutrition_snapshot: calculated.nutrition,
-    items: calculated.items,
-    created_at: new Date().toISOString()
+    people: safePeople,
+    goal: input.goal || null,
+    items: calculated.items.map((it, idx) => ({ id: idx + 1, ...it })),
+    created_at: new Date().toISOString(),
+    expires_at: expiresAt,
+    cancel_reason: null,
+    paid_at: null,
+    cooking_at: null,
+    packed_at: null,
+    delivered_at: null
   };
 
   globalFallback._fallbackOrders!.set(orderId, record);
-  return { orderId, publicCode, publicToken };
+  await recordOrderEvent(orderId, null, "awaiting_payment", "customer", "Khách tạo đơn hàng");
+  return { orderId, publicCode, publicToken, expiresAt };
 }
 
 type DbOrderRow = {
@@ -652,7 +691,11 @@ type DbOrderRow = {
   shipping_fee_vnd?: number | null;
   total_vnd: number;
   nutrition_snapshot: Macros;
+  people?: number | null;
+  goal?: string | null;
   created_at: string;
+  expires_at?: string | null;
+  cancel_reason?: string | null;
   paid_at?: string | null;
   cooking_at?: string | null;
   packed_at?: string | null;
@@ -692,8 +735,12 @@ function mapOrderRow(order: DbOrderRow, items: DbOrderItemRow[]): OrderRecord {
     shipping_fee_vnd: order.shipping_fee_vnd ?? 0,
     total_vnd: order.total_vnd,
     nutrition_snapshot: order.nutrition_snapshot,
+    people: order.people ? Number(order.people) : 1,
+    goal: order.goal ?? null,
     items: itemSnapshots,
     created_at: order.created_at,
+    expires_at: order.expires_at ?? null,
+    cancel_reason: order.cancel_reason ?? null,
     paid_at: order.paid_at,
     cooking_at: order.cooking_at ?? null,
     packed_at: order.packed_at ?? null,
@@ -706,17 +753,27 @@ function mapOrderRow(order: DbOrderRow, items: DbOrderItemRow[]): OrderRecord {
  */
 export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]> {
   ensureDemoSeedLoaded();
-  const normalizedFilter = statusFilter && statusFilter !== "all" ? statusFilter : undefined;
+  // Tự động kiểm tra và hủy các đơn awaiting_payment đã quá hạn
+  await checkAndCancelExpiredOrders();
+
+  const isPendingReview =
+    statusFilter === "pending_review" ||
+    statusFilter === "waiting_confirmation" ||
+    statusFilter === "pending_verification";
+  const normalizedFilter =
+    statusFilter && statusFilter !== "all" && !isPendingReview ? statusFilter : undefined;
 
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
       let query = supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
         .order("created_at", { ascending: false });
 
-      if (normalizedFilter) {
+      if (isPendingReview) {
+        query = query.in("status", ["awaiting_payment", "pending_verification"]);
+      } else if (normalizedFilter) {
         query = query.eq("status", normalizedFilter);
       }
 
@@ -737,9 +794,19 @@ export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]
           itemsByOrder.set(oid, list);
         }
 
-        return (orders as DbOrderRow[]).map((order) =>
+        const mapped = (orders as DbOrderRow[]).map((order) =>
           mapOrderRow(order, itemsByOrder.get(order.id) ?? [])
         );
+
+        if (isPendingReview) {
+          mapped.sort((a, b) => {
+            if (a.status === "pending_verification" && b.status !== "pending_verification") return -1;
+            if (b.status === "pending_verification" && a.status !== "pending_verification") return 1;
+            return b.created_at.localeCompare(a.created_at);
+          });
+        }
+
+        return mapped;
       }
     } catch (err) {
       console.warn("Supabase getAllOrders error, using fallback:", err);
@@ -747,6 +814,15 @@ export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]
   }
 
   let list = Array.from(globalFallback._fallbackOrders!.values());
+  if (isPendingReview) {
+    list = list.filter((o) => o.status === "awaiting_payment" || o.status === "pending_verification");
+    list.sort((a, b) => {
+      if (a.status === "pending_verification" && b.status !== "pending_verification") return -1;
+      if (b.status === "pending_verification" && a.status !== "pending_verification") return 1;
+      return b.created_at.localeCompare(a.created_at);
+    });
+    return list;
+  }
   if (normalizedFilter) {
     list = list.filter((o) => o.status === normalizedFilter);
   }
@@ -764,7 +840,7 @@ export async function getOrderById(orderId: string): Promise<OrderRecord | null>
       const [{ data: order }, { data: items }] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
+          .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
           .eq("id", orderId)
           .maybeSingle(),
         supabase
@@ -794,7 +870,7 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
       const supabase = createServerSupabaseClient();
       const { data: order } = await supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
         .eq("public_code", code)
         .maybeSingle();
 
@@ -822,12 +898,14 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
  */
 export async function getOrderByPublicToken(token: string): Promise<OrderRecord | null> {
   ensureDemoSeedLoaded();
+  await checkAndCancelExpiredOrders();
+
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
       const { data: order } = await supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at")
+        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
         .eq("public_token", token)
         .maybeSingle();
 
@@ -884,12 +962,129 @@ export async function countAwaitingOrdersByPhone(phone: string): Promise<number>
   return Math.max(dbCount, fallbackCount);
 }
 
+/**
+ * Ghi vết sự kiện thay đổi trạng thái đơn hàng vào order_events
+ */
+export async function recordOrderEvent(
+  orderId: string,
+  fromStatus: OrderStatus | string | null,
+  toStatus: OrderStatus | string,
+  actor: "customer" | "admin" | "system" | string = "system",
+  note?: string | null
+): Promise<void> {
+  const event: OrderEvent = {
+    id: crypto.randomUUID(),
+    order_id: orderId,
+    from_status: (fromStatus as OrderStatus) || null,
+    to_status: toStatus as OrderStatus,
+    actor,
+    note: note || null,
+    created_at: new Date().toISOString(),
+  };
+
+  if (!globalFallback._fallbackOrderEvents) {
+    globalFallback._fallbackOrderEvents = [];
+  }
+  globalFallback._fallbackOrderEvents.push(event);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      await supabase.from("order_events").insert({
+        id: event.id,
+        order_id: event.order_id,
+        from_status: event.from_status,
+        to_status: event.to_status,
+        actor: event.actor,
+        note: event.note,
+        created_at: event.created_at,
+      });
+    } catch (err) {
+      console.warn("Supabase recordOrderEvent failed:", err);
+    }
+  }
+}
+
+/**
+ * Lấy lịch sử sự kiện của đơn hàng
+ */
+export async function getOrderEvents(orderId: string): Promise<OrderEvent[]> {
+  ensureDemoSeedLoaded();
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("order_events")
+        .select("id, order_id, from_status, to_status, actor, note, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true });
+      if (!error && data) {
+        return data as OrderEvent[];
+      }
+    } catch (err) {
+      console.warn("Supabase getOrderEvents error:", err);
+    }
+  }
+
+  return (globalFallback._fallbackOrderEvents ?? []).filter((e) => e.order_id === orderId);
+}
+
+/**
+ * Kiểm tra và tự động hủy các đơn awaiting_payment đã quá hạn PAYMENT_WINDOW_MIN.
+ * TUYỆT ĐỐI KHÔNG tự hủy đơn ở trạng thái pending_verification.
+ */
+export async function checkAndCancelExpiredOrders(): Promise<number> {
+  ensureDemoSeedLoaded();
+  const nowIso = new Date().toISOString();
+  let cancelledCount = 0;
+
+  for (const order of globalFallback._fallbackOrders!.values()) {
+    // Chỉ hủy đơn awaiting_payment quá hạn!
+    if (order.status === "awaiting_payment" && order.expires_at && order.expires_at <= nowIso) {
+      order.status = "cancelled";
+      order.cancel_reason = "expired";
+      cancelledCount++;
+      await recordOrderEvent(order.id, "awaiting_payment", "cancelled", "system", "Hết hạn thanh toán");
+    }
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      const { data: expiredOrders } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("status", "awaiting_payment")
+        .lte("expires_at", nowIso);
+
+      if (expiredOrders && expiredOrders.length > 0) {
+        for (const exp of expiredOrders) {
+          const { error } = await supabase
+            .from("orders")
+            .update({ status: "cancelled", cancel_reason: "expired" })
+            .eq("id", exp.id)
+            .eq("status", "awaiting_payment");
+          if (!error) {
+            cancelledCount++;
+            await recordOrderEvent(exp.id, "awaiting_payment", "cancelled", "system", "Hết hạn thanh toán");
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase checkAndCancelExpiredOrders error:", err);
+    }
+  }
+
+  return cancelledCount;
+}
+
 const ALLOWED_STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  awaiting_payment: ["pending_verification"],
+  awaiting_payment: ["pending_verification", "paid", "cancelled"],
   pending_verification: ["paid"],
   paid: ["cooking"],
   cooking: ["packed"],
-  packed: ["delivered"]
+  packed: ["delivered"],
+  cancelled: ["paid"], // Chỉ khi cancel_reason === 'expired' và do admin khôi phục
 };
 
 const STATUS_TIMESTAMP_FIELD: Partial<
@@ -902,50 +1097,101 @@ const STATUS_TIMESTAMP_FIELD: Partial<
 };
 
 /**
- * Cập nhật trạng thái đơn hàng có kiểm tra luồng chuyển hợp lệ và ghi timestamp
+ * Chuyển trạng thái đơn hàng (State machine) có kiểm tra điều kiện, chống trùng (optimistic lock),
+ * ghi nhận actor ('admin', 'customer', 'system') và lưu vết vào order_events.
  */
-export async function updateOrderStatusWithTimestamp(
+export async function transitionOrderStatus(
   orderId: string,
-  newStatus: OrderStatus
-): Promise<{ ok: boolean; error?: string; order?: OrderRecord }> {
+  newStatus: OrderStatus,
+  options?: {
+    actor?: "admin" | "customer" | "system" | string;
+    note?: string;
+    cancelReason?: string;
+    expectedCurrentStatuses?: OrderStatus[];
+  }
+): Promise<{ ok: boolean; conflict?: boolean; error?: string; order?: OrderRecord }> {
   const current = await getOrderById(orderId);
   if (!current) {
     return { ok: false, error: "Không tìm thấy đơn hàng." };
   }
 
-  const allowed = ALLOWED_STATUS_TRANSITIONS[current.status] ?? [];
-  if (!allowed.includes(newStatus)) {
+  const fromStatus = current.status;
+
+  // Chống trùng: kiểm tra expectedCurrentStatuses nếu có yêu cầu
+  if (
+    options?.expectedCurrentStatuses &&
+    options.expectedCurrentStatuses.length > 0 &&
+    !options.expectedCurrentStatuses.includes(fromStatus)
+  ) {
     return {
       ok: false,
-      error: `Không thể chuyển trạng thái từ "${current.status}" sang "${newStatus}".`
+      conflict: true,
+      error: `Đơn hàng đã được đổi sang trạng thái "${fromStatus}" trước đó (409 Conflict).`,
     };
   }
 
+  // Kiểm tra bảng chuyển trạng thái hợp lệ
+  const allowed = ALLOWED_STATUS_TRANSITIONS[fromStatus] ?? [];
+  if (!allowed.includes(newStatus)) {
+    return {
+      ok: false,
+      conflict: true,
+      error: `Không thể chuyển trạng thái từ "${fromStatus}" sang "${newStatus}".`,
+    };
+  }
+
+  // Khôi phục đơn: nếu từ 'cancelled' sang 'paid', bắt buộc cancel_reason phải là 'expired'
+  if (fromStatus === "cancelled" && newStatus === "paid") {
+    if (current.cancel_reason !== "expired") {
+      return {
+        ok: false,
+        error: "Chỉ có thể khôi phục các đơn hàng bị hủy do hết hạn (expired).",
+      };
+    }
+  }
+
+  const actor = options?.actor ?? "system";
   const now = new Date().toISOString();
   const tsField = STATUS_TIMESTAMP_FIELD[newStatus];
+
+  const updatedCancelReason =
+    newStatus === "cancelled"
+      ? options?.cancelReason ?? current.cancel_reason ?? "other"
+      : null;
+
+  const payload: Record<string, unknown> = {
+    status: newStatus,
+    cancel_reason: updatedCancelReason,
+  };
+  if (tsField) {
+    payload[tsField] = now;
+  }
 
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
-      const payload: Record<string, unknown> = { status: newStatus };
-      if (tsField) {
-        payload[tsField] = now;
+      let query = supabase.from("orders").update(payload).eq("id", orderId);
+      if (options?.expectedCurrentStatuses && options.expectedCurrentStatuses.length > 0) {
+        query = query.in("status", options.expectedCurrentStatuses);
       }
-      const { error } = await supabase
-        .from("orders")
-        .update(payload)
-        .eq("id", orderId);
-      if (error) {
-        throw error;
+      const { data, error } = await query.select("id, status").maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        return {
+          ok: false,
+          conflict: true,
+          error: "Trạng thái đơn hàng đã bị thay đổi bởi thao tác khác (409 Conflict).",
+        };
       }
     } catch (err) {
-      console.warn("Supabase updateOrderStatusWithTimestamp error:", err);
+      console.warn("Supabase transitionOrderStatus error:", err);
     }
   }
 
   const fallback = globalFallback._fallbackOrders!.get(orderId);
   if (fallback) {
     fallback.status = newStatus;
+    fallback.cancel_reason = updatedCancelReason;
     if (tsField) {
       fallback[tsField] = now;
     }
@@ -954,10 +1200,49 @@ export async function updateOrderStatusWithTimestamp(
   const updatedOrder: OrderRecord = {
     ...current,
     status: newStatus,
-    ...(tsField ? { [tsField]: now } : {})
+    cancel_reason: updatedCancelReason,
+    ...(tsField ? { [tsField]: now } : {}),
   };
 
+  const defaultNote =
+    fromStatus === "cancelled" && newStatus === "paid"
+      ? "Khôi phục và xác nhận đã nhận tiền"
+      : undefined;
+
+  await recordOrderEvent(orderId, fromStatus, newStatus, actor, options?.note || defaultNote);
+
   return { ok: true, order: updatedOrder };
+}
+
+/**
+ * Cập nhật trạng thái đơn hàng có kiểm tra luồng chuyển hợp lệ và ghi timestamp
+ */
+export async function updateOrderStatusWithTimestamp(
+  orderId: string,
+  newStatus: OrderStatus,
+  options?: { actor?: string; note?: string; expectedCurrentStatuses?: OrderStatus[] }
+): Promise<{ ok: boolean; conflict?: boolean; error?: string; order?: OrderRecord }> {
+  return transitionOrderStatus(orderId, newStatus, {
+    actor: options?.actor ?? "admin",
+    note: options?.note,
+    expectedCurrentStatuses: options?.expectedCurrentStatuses,
+  });
+}
+
+/**
+ * Cập nhật trạng thái đơn hàng (ví dụ sang 'pending_verification')
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  newStatus: OrderStatus,
+  options?: { actor?: string; note?: string; expectedCurrentStatuses?: OrderStatus[] }
+): Promise<boolean> {
+  const res = await transitionOrderStatus(orderId, newStatus, {
+    actor: options?.actor ?? (newStatus === "pending_verification" ? "customer" : "admin"),
+    note: options?.note,
+    expectedCurrentStatuses: options?.expectedCurrentStatuses,
+  });
+  return res.ok;
 }
 
 /**
@@ -1008,46 +1293,7 @@ export async function getDishIngredientsSnapshot(
     .filter((x): x is { name: string; rawG: number; allergens: string[] } => x !== null);
 }
 
-/**
- * Cập nhật trạng thái đơn hàng (ví dụ sang 'pending_verification')
- */
-export async function updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<boolean> {
-  let updated = false;
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = createServerSupabaseClient();
-      const payload: Record<string, unknown> = { status: newStatus };
-      if (newStatus === "paid") {
-        payload.paid_at = new Date().toISOString();
-      }
-
-      const { data, error } = await supabase
-        .from("orders")
-        .update(payload)
-        .eq("id", orderId)
-        .select("id")
-        .maybeSingle();
-
-      if (!error && data) {
-        updated = true;
-      }
-    } catch (err) {
-      console.warn("Supabase updateOrderStatus error:", err);
-    }
-  }
-
-  const fallback = globalFallback._fallbackOrders!.get(orderId);
-  if (fallback) {
-    fallback.status = newStatus;
-    if (newStatus === "paid") {
-      fallback.paid_at = new Date().toISOString();
-    }
-    updated = true;
-  }
-
-  return updated;
-}
 
 
 
@@ -1107,6 +1353,8 @@ type DbNutritionSnapshotRow = {
   allergens?: string[];
   source_note?: string | null;
   lot_code?: string | null;
+  people?: number | null;
+  per_person_estimate?: Macros | null;
   packed_at: string;
 };
 
@@ -1134,6 +1382,8 @@ function mapNutritionSnapshotRow(row: DbNutritionSnapshotRow): PortionSnapshot {
     allergens: Array.isArray(row.allergens) ? row.allergens : [],
     sourceNote: row.source_note ?? null,
     lotCode: row.lot_code ?? null,
+    people: row.people ? Number(row.people) : 1,
+    per_person_estimate: (row.per_person_estimate as Macros) ?? null,
     packedAt: row.packed_at
   };
 }
@@ -1211,6 +1461,8 @@ export async function savePortionSnapshot(input: Omit<PortionSnapshot, 'id'>): P
         allergens: input.allergens,
         source_note: input.sourceNote ?? null,
         lot_code: input.lotCode ?? null,
+        people: input.people ?? 1,
+        per_person_estimate: input.per_person_estimate ?? null,
         packed_at: input.packedAt,
       });
     } catch (e) { console.warn('savePortionSnapshot supabase error', e); }

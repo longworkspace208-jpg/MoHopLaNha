@@ -402,7 +402,7 @@ export default function CheckoutPage() {
                   ? "Đang khởi tạo đơn hàng…"
                   : !addressValidation.inService && address.length > 0
                     ? "Địa chỉ ngoài vùng — Không thể đặt"
-                    : `Đặt cơm & Nhận mã VietQR · ${formatVnd(Math.round(total))}`}
+                    : `Đặt cơm & Chuyển khoản · ${formatVnd(Math.round(total))}`}
               </span>
               {!submitting && isFormValid && <span aria-hidden="true">→</span>}
             </button>

@@ -218,7 +218,7 @@ export default function Home() {
               },
               {
                 num: "03",
-                title: "VietQR đối soát minh bạch",
+                title: "Chuyển khoản đối soát minh bạch",
                 desc: "Chuyển khoản đúng mã đơn MHLN#### và theo dõi tiến độ nấu tới lúc giao nóng.",
               },
               {
@@ -283,7 +283,7 @@ export default function Home() {
                 </span>
               </li>
               <li className="flex items-center justify-between py-3.5">
-                <span>Chốt đơn VietQR &amp; theo dõi trực tiếp</span>
+                <span>Chốt đơn chuyển khoản &amp; theo dõi trực tiếp</span>
                 <span className="font-mono text-xs font-bold uppercase tracking-wider text-coral">
                   MHLN####
                 </span>

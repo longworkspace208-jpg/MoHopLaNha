@@ -45,6 +45,7 @@ export const orderCreationSchema = z.object({
     .min(1, { message: "Số người ăn tối thiểu là 1." })
     .max(10, { message: "Số người ăn tối đa là 10." })
     .optional(),
+  goal: z.string().trim().max(50).optional(),
   items: z
     .array(
       z.object({
@@ -73,25 +74,32 @@ export const orderCreationSchema = z.object({
 });
 
 /**
- * Kiểm tra ràng buộc bước nhảy và khoảng gram của món ăn
+ * Kiểm tra ràng buộc bước nhảy và khoảng gram của món ăn.
+ * min_g và max_g trong DB là giới hạn cho 1 suất.
+ * Khoảng cho phép của một dòng giỏ là min_g đến max_g × số người, và là bội số của step_g.
  */
 export function validateGramsForDish(
   dish: { name: string; min_g: number; max_g: number; step_g: number },
-  grams: number
+  grams: number,
+  people: number = 1
 ): { valid: boolean; error?: string } {
-  if (grams < dish.min_g) {
+  const safePeople = Math.max(1, Math.min(10, Math.round(people || 1)));
+  const minG = dish.min_g;
+  const maxG = dish.max_g * safePeople;
+
+  if (grams < minG) {
     return {
       valid: false,
-      error: `Định lượng món "${dish.name}" tối thiểu là ${dish.min_g}g.`,
+      error: `Định lượng món "${dish.name}" tối thiểu là ${minG}g.`,
     };
   }
-  if (grams > dish.max_g) {
+  if (grams > maxG) {
     return {
       valid: false,
-      error: `Định lượng món "${dish.name}" tối đa là ${dish.max_g}g.`,
+      error: `Định lượng món "${dish.name}" tối đa cho ${safePeople} người là ${maxG}g.`,
     };
   }
-  if (dish.step_g > 0 && grams % dish.step_g !== 0 && (grams - dish.min_g) % dish.step_g !== 0) {
+  if (dish.step_g > 0 && grams % dish.step_g !== 0 && (grams - minG) % dish.step_g !== 0) {
     return {
       valid: false,
       error: `Định lượng món "${dish.name}" (${grams}g) phải là bội số của bước nhảy ${dish.step_g}g.`,

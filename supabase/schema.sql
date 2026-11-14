@@ -13,6 +13,8 @@ create table public.orders (
   status public.order_status not null default 'awaiting_payment',
   total_vnd integer not null check (total_vnd > 0),
   nutrition_snapshot jsonb not null,
+  people integer default 1 check (people >= 1 and people <= 10),
+  goal text,
   created_at timestamptz not null default now(),
   paid_at timestamptz
 );
@@ -145,6 +147,8 @@ create table if not exists public.nutrition_snapshots (
   allergens text[] not null default '{}',
   source_note text,
   lot_code text,
+  people integer default 1 check (people >= 1 and people <= 10),
+  per_person_estimate jsonb,
   packed_at timestamptz not null default now()
 );
 alter table public.nutrition_snapshots enable row level security;
@@ -215,3 +219,22 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_
 CREATE INDEX IF NOT EXISTS idx_menu_dishes_menu_day_id ON public.menu_dishes(menu_day_id);
 CREATE INDEX IF NOT EXISTS idx_combos_menu_day_id ON public.combos(menu_day_id);
 CREATE INDEX IF NOT EXISTS idx_combo_items_combo_id ON public.combo_items(combo_id);
+
+-- Migration 004: Manual Payment Flow, Expiration, and Order Audit Events
+alter table public.orders
+  add column if not exists expires_at timestamptz,
+  add column if not exists cancel_reason text;
+
+create table if not exists public.order_events (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  from_status text,
+  to_status text not null,
+  actor text not null default 'system',
+  note text,
+  created_at timestamptz not null default now()
+);
+alter table public.order_events enable row level security;
+create index if not exists idx_orders_expires_at on public.orders(status, expires_at);
+create index if not exists idx_order_events_order_id on public.order_events(order_id);
+create index if not exists idx_order_events_created_at on public.order_events(created_at desc);
