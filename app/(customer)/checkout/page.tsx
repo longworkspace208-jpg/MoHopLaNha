@@ -22,6 +22,22 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
 
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [predictions, setPredictions] = useState<
+    Array<{ place_id: string; description: string; main_text: string; secondary_text: string }>
+  >([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [activePredictionIndex, setActivePredictionIndex] = useState(-1);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [deliveryCheck, setDeliveryCheck] = useState<{
+    deliverable: boolean;
+    distance_m: number;
+    duration_s: number;
+    reason: string;
+    approximate?: boolean;
+  } | null>(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
+
   const [touchedAddress, setTouchedAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +45,64 @@ export default function CheckoutPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Gợi ý địa chỉ từ Goong Place AutoComplete & bộ dữ liệu Hà Nội (debounce 250ms, input >= 2 ký tự)
+  useEffect(() => {
+    const clean = address.trim();
+    if (clean.length < 2 || selectedPlaceId) {
+      setPredictions([]);
+      setIsSearchingAddress(false);
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/delivery/autocomplete?input=${encodeURIComponent(clean)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPredictions(data.predictions || []);
+          setShowPredictions(true);
+          setActivePredictionIndex(-1);
+        }
+      } catch {
+        setPredictions([]);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [address, selectedPlaceId]);
+
+  async function verifyAddressDistance(params: { placeId?: string; address?: string }) {
+    setCheckingDelivery(true);
+    try {
+      const res = await fetch("/api/delivery/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeliveryCheck(data);
+      }
+    } catch {
+      // Bỏ qua lỗi kết nối
+    } finally {
+      setCheckingDelivery(false);
+    }
+  }
+
+  function handleSelectPrediction(p: { place_id: string; description: string }) {
+    setAddress(p.description);
+    setSelectedPlaceId(p.place_id);
+    setShowPredictions(false);
+    setPredictions([]);
+    setActivePredictionIndex(-1);
+    setTouchedAddress(true);
+    verifyAddressDistance({ placeId: p.place_id, address: p.description });
+  }
 
   const validLines = useMemo(() => {
     return lines
@@ -51,6 +125,10 @@ export default function CheckoutPage() {
     return validateServiceArea(address);
   }, [address]);
 
+  const isAddressDeliverable = deliveryCheck
+    ? deliveryCheck.deliverable
+    : addressValidation.inService;
+
   const isPhoneValid = useMemo(() => {
     const cleaned = phone.trim().replace(/[\s.-]/g, "");
     return /^0\d{9,10}$/.test(cleaned);
@@ -60,7 +138,8 @@ export default function CheckoutPage() {
     customerName.trim().length >= 2 &&
     isPhoneValid &&
     address.trim().length >= 5 &&
-    addressValidation.inService &&
+    isAddressDeliverable &&
+    !checkingDelivery &&
     validLines.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -242,53 +321,236 @@ export default function CheckoutPage() {
             />
           </div>
 
-          <div>
-            <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
-              Địa chỉ nhận hàng (kèm Quận/Huyện){" "}
-              <span className="text-coral">*</span>
-            </label>
-            <textarea
-              required
-              rows={2}
-              placeholder="Ví dụ: 123 Lê Lợi, Phường Bến Nghé, Quận 1"
-              value={address}
-              onChange={(e) => {
-                setAddress(e.target.value);
-                setTouchedAddress(true);
-              }}
-              className={`mt-2 w-full border bg-ivory/30 px-3.5 py-3 text-sm text-ink outline-none transition-colors focus:bg-white ${
-                touchedAddress && address && !addressValidation.inService
-                  ? "border-red-600 focus:border-red-700"
-                  : addressValidation.inService
-                    ? "border-forest focus:border-forest"
-                    : "border-rule focus:border-forest"
-              }`}
-            />
+          <div className="relative">
+            <div className="flex items-center justify-between">
+              <label className="block font-mono text-xs font-bold uppercase tracking-[0.14em] text-forest">
+                Địa chỉ nhận hàng (Hà Nội){" "}
+                <span className="text-coral">*</span>
+              </label>
+              <span className="font-mono text-[10px] text-muted">
+                Bán kính 20km từ 91 Chùa Láng
+              </span>
+            </div>
 
-            {address.trim().length > 0 && (
+            {/* GỢI Ý NHANH CÁC ĐỊA ĐIỂM QUANH 91 CHÙA LÁNG & HÀ NỘI */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-[10px] text-muted">Gợi ý nhanh:</span>
+              {[
+                { label: "91 Chùa Láng", address: "91 Chùa Láng, Phường Láng Thượng, Quận Đống Đa, Hà Nội" },
+                { label: "ĐH Ngoại Thương", address: "Đại học Ngoại Thương (FTU) - 91 Chùa Láng, Đống Đa, Hà Nội" },
+                { label: "HV Ngoại Giao", address: "Học viện Ngoại Giao (DAV) - 69 Chùa Láng, Đống Đa, Hà Nội" },
+                { label: "ĐH Luật Hà Nội", address: "Trường Đại học Luật Hà Nội - 87 Nguyễn Chí Thanh, Đống Đa, Hà Nội" },
+                { label: "Vincom NCT", address: "Vincom Center Nguyễn Chí Thanh - 54A Nguyễn Chí Thanh, Đống Đa, Hà Nội" },
+                { label: "Duy Tân Cầu Giấy", address: "Phố Duy Tân, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Hà Nội" },
+                { label: "Keangnam Phạm Hùng", address: "Tòa nhà Keangnam Hanoi Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội" },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => {
+                    setAddress(chip.address);
+                    setSelectedPlaceId(null);
+                    setShowPredictions(false);
+                    setTouchedAddress(true);
+                    verifyAddressDistance({ address: chip.address });
+                  }}
+                  className="rounded border border-forest/20 bg-forest/5 px-2 py-0.5 text-[11px] font-medium text-forest transition hover:bg-forest hover:text-white"
+                >
+                  + {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Ô NHẬP ĐỊA CHỈ KÈM BIỂU TƯỢNG VÀ AUTOCOMPLETE */}
+            <div className="relative mt-2">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
+                <svg className="h-4 w-4 text-forest" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </div>
+
+              <input
+                type="text"
+                required
+                placeholder="Gõ số nhà, tên đường, tòa nhà hoặc trường học tại Hà Nội..."
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  setSelectedPlaceId(null);
+                  setDeliveryCheck(null);
+                  setTouchedAddress(true);
+                }}
+                onKeyDown={(e) => {
+                  if (predictions.length === 0) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setActivePredictionIndex((prev) =>
+                      prev < predictions.length - 1 ? prev + 1 : 0
+                    );
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActivePredictionIndex((prev) =>
+                      prev > 0 ? prev - 1 : predictions.length - 1
+                    );
+                  } else if (e.key === "Enter" && activePredictionIndex >= 0) {
+                    e.preventDefault();
+                    handleSelectPrediction(predictions[activePredictionIndex]);
+                  } else if (e.key === "Escape") {
+                    setShowPredictions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (predictions.length > 0) setShowPredictions(true);
+                }}
+                onBlur={() => {
+                  // Đóng dropdown sau một khoảng delay để kịp nhận click chọn
+                  setTimeout(() => setShowPredictions(false), 250);
+                  if (!selectedPlaceId && address.trim().length >= 5 && !deliveryCheck) {
+                    verifyAddressDistance({ address: address.trim() });
+                  }
+                }}
+                className={`w-full border bg-ivory/30 py-3 pl-9 pr-10 text-sm text-ink outline-none transition-colors focus:bg-white ${
+                  touchedAddress && address && !isAddressDeliverable
+                    ? "border-amber-500 focus:border-amber-600"
+                    : isAddressDeliverable
+                      ? "border-forest focus:border-forest"
+                      : "border-rule focus:border-forest"
+                }`}
+              />
+
+              {/* Icon xóa nhanh hoặc loading */}
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                {isSearchingAddress ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-forest border-t-transparent" />
+                ) : address ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddress("");
+                      setSelectedPlaceId(null);
+                      setDeliveryCheck(null);
+                      setPredictions([]);
+                      setShowPredictions(false);
+                    }}
+                    className="text-muted hover:text-ink"
+                    title="Xóa địa chỉ"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* DANH SÁCH GỢI Ý ĐỊA CHỈ TỰ ĐỘNG (AUTOCOMPLETE DROPDOWN) */}
+            {showPredictions && predictions.length > 0 && (
+              <ul className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-forest/30 bg-white py-1 shadow-2xl">
+                <li className="border-b border-rule bg-ivory/40 px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
+                  Gợi ý địa chỉ nhận cơm (Hà Nội)
+                </li>
+                {predictions.map((p, idx) => (
+                  <li key={p.place_id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectPrediction(p);
+                      }}
+                      className={`flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left text-xs transition-colors ${
+                        idx === activePredictionIndex
+                          ? "bg-forest/15 text-forest"
+                          : "hover:bg-forest/5 focus:bg-forest/5"
+                      }`}
+                    >
+                      <svg
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-forest"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                      <div className="min-w-0 flex-1">
+                        <strong className="block truncate font-semibold text-ink">
+                          {p.main_text}
+                        </strong>
+                        <span className="block truncate text-[11px] text-muted">
+                          {p.secondary_text}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* THÔNG BÁO TRẠNG THÁI KIỂM TRA PHẠM VI GIAO HÀNG */}
+            {checkingDelivery && (
+              <div className="mt-2.5 flex items-center gap-2 border-l-4 border-amber-500 bg-amber-50 px-3 py-2 font-mono text-xs text-amber-800">
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+                Đang kiểm tra khoảng cách giao hàng từ cửa hàng (91 Chùa Láng)…
+              </div>
+            )}
+
+            {!checkingDelivery && address.trim().length > 0 && (
               <div className="mt-2.5">
-                {addressValidation.inService ? (
+                {deliveryCheck ? (
+                  deliveryCheck.deliverable ? (
+                    <div className="border-l-4 border-forest bg-forest/5 px-3 py-2 text-xs text-forest">
+                      <p className="font-semibold">✓ Đủ điều kiện nhận cơm</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted">
+                        {deliveryCheck.reason} {deliveryCheck.approximate ? "(ước tính)" : ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      role="alert"
+                      className="border-l-4 border-amber-600 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900"
+                    >
+                      <p className="font-bold">Địa chỉ ngoài phạm vi giao hàng 20km</p>
+                      <p className="mt-0.5">{deliveryCheck.reason}</p>
+                    </div>
+                  )
+                ) : addressValidation.inService ? (
                   <p className="border-l-4 border-forest bg-forest/5 px-3 py-2 text-xs font-semibold text-forest">
-                    ✓ Địa chỉ thuộc vùng giao hàng: {addressValidation.matchedDistrict}
+                    ✓ Địa chỉ hợp lệ ({addressValidation.matchedDistrict})
                   </p>
                 ) : (
                   <div
                     role="alert"
-                    className="border-l-4 border-red-600 bg-red-50/60 px-3.5 py-2.5 text-xs text-red-800"
+                    className="border-l-4 border-amber-600 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900"
                   >
-                    <p className="font-bold">Không thể giao hàng đến địa chỉ này</p>
+                    <p className="font-bold">Địa chỉ ngoài vùng phục vụ</p>
                     <p className="mt-1">{addressValidation.message}</p>
                   </div>
                 )}
               </div>
             )}
+
             {!address && (
               <p className="mt-1.5 text-[11px] text-muted">
-                Vùng hỗ trợ giao hàng:{" "}
-                {DELIVERY_CONFIG.serviceDistricts
-                  .map((d) => d.district)
-                  .join(", ")}
-                .
+                Phục vụ giao cơm tận nơi trong bán kính 20km tính từ 91 Chùa Láng, Đống Đa, Hà Nội.
               </p>
             )}
           </div>

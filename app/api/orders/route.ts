@@ -8,6 +8,7 @@ import {
   type OrderCreationItem,
 } from "@/lib/orders-db";
 import { validateServiceArea } from "@/lib/delivery-config";
+import { checkDeliveryDistance } from "@/lib/goong";
 import { orderCreationSchema, formatZodError } from "@/lib/validations";
 import { getClientIp, limit, rateLimitResponse } from "@/lib/ratelimit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
@@ -130,10 +131,14 @@ export async function POST(request: Request) {
     if (!allowOverride) {
       const addressCheck = validateServiceArea(validData.address);
       if (!addressCheck.inService) {
-        return NextResponse.json(
-          { error: addressCheck.message ?? "Địa chỉ nằm ngoài vùng phục vụ." },
-          { status: 400 }
-        );
+        // Kiểm tra phạm vi giao hàng 20km qua Goong / Haversine
+        const goongCheck = await checkDeliveryDistance({ address: validData.address });
+        if (!goongCheck.deliverable) {
+          return NextResponse.json(
+            { error: goongCheck.reason || addressCheck.message || "Địa chỉ nằm ngoài vùng phục vụ." },
+            { status: 400 }
+          );
+        }
       }
     }
 

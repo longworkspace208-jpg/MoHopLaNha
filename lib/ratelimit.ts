@@ -9,7 +9,9 @@ export type RateLimitRule =
   | "admin_login"
   | "order_status"
   | "usda_search"
-  | "orders_lookup";
+  | "orders_lookup"
+  | "delivery_autocomplete"
+  | "delivery_check";
 
 export interface RateLimitResult {
   ok: boolean;
@@ -59,6 +61,18 @@ const RULE_CONFIGS: Record<RateLimitRule, RuleConfig> = {
     windowMs: 10 * 60 * 1000, // 10 phút
     upstashWindow: "10 m",
     prefix: "ratelimit:orders_lookup",
+  },
+  delivery_autocomplete: {
+    limit: 60,
+    windowMs: 60 * 1000, // 1 phút
+    upstashWindow: "1 m",
+    prefix: "ratelimit:delivery_autocomplete",
+  },
+  delivery_check: {
+    limit: 30,
+    windowMs: 60 * 1000, // 1 phút
+    upstashWindow: "1 m",
+    prefix: "ratelimit:delivery_check",
   },
 };
 

@@ -341,7 +341,7 @@ export function FacebookOrderForm() {
               <input
                 type="text"
                 required
-                placeholder="VD: 123 Lê Lợi, Phường Bến Nghé, Quận 1"
+                placeholder="VD: 91 Chùa Láng, Phường Láng Thượng, Đống Đa, Hà Nội"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-700"

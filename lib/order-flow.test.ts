@@ -11,10 +11,10 @@ import { getBankConfig } from "./bank-config";
 
 describe("End-to-End Order & Payment Flow", () => {
   it("validates address service area correctly", () => {
-    const valid = validateServiceArea("123 Hai Bà Trưng, Phường Bến Nghé, Quận 1");
+    const valid = validateServiceArea("91 Chùa Láng, Phường Láng Thượng, Quận Đống Đa, Hà Nội");
     expect(valid.inService).toBe(true);
 
-    const outside = validateServiceArea("99 Cầu Giấy, Hà Nội");
+    const outside = validateServiceArea("123 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM");
     expect(outside.inService).toBe(false);
     expect(outside.message).toContain("Địa chỉ ngoài vùng phục vụ");
   });
@@ -45,7 +45,7 @@ describe("End-to-End Order & Payment Flow", () => {
       customerName: "Nguyễn Văn Test",
       phone: "0901234567",
       customerEmail: "test@example.com",
-      deliveryAddress: "45 Lê Thánh Tôn, Bến Nghé, Quận 1",
+      deliveryAddress: "91 Chùa Láng, Phường Láng Thượng, Đống Đa, Hà Nội",
       note: "Giao trước 12h",
       items
     });
@@ -59,7 +59,7 @@ describe("End-to-End Order & Payment Flow", () => {
     expect(order?.status).toBe("awaiting_payment");
     expect(order?.customer_name).toBe("Nguyễn Văn Test");
     expect(order?.customer_email).toBe("test@example.com");
-    expect(order?.delivery_address).toContain("Quận 1");
+    expect(order?.delivery_address).toContain("Chùa Láng");
     expect(order?.shipping_fee_vnd).toBe(DELIVERY_CONFIG.shippingFeeVnd);
     expect(order?.total_vnd).toBe(order!.subtotal_vnd + DELIVERY_CONFIG.shippingFeeVnd);
     expect(order?.items).toHaveLength(1);
