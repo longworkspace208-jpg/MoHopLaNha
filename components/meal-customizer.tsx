@@ -90,26 +90,20 @@ export function MealCustomizer() {
           return (
             <article key={line.dish.id} className="py-4">
               <div className="flex items-start gap-3.5">
-                <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white shadow-sm">
-                  {line.dish.image_url ? (
-                    line.dish.image_url.startsWith("http") ||
-                    line.dish.image_url.startsWith("/") ? (
-                      <Image
-                        src={line.dish.image_url}
-                        alt={line.dish.name}
-                        width={64}
-                        height={64}
-                        sizes="64px"
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                      />
-                    ) : (
-                      <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
-                    )
-                  ) : (
-                    <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
-                  )}
-                </div>
+                {line.dish.image_url &&
+                (line.dish.image_url.startsWith("http") || line.dish.image_url.startsWith("/")) ? (
+                  <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white shadow-sm">
+                    <Image
+                      src={line.dish.image_url}
+                      alt={line.dish.name}
+                      width={64}
+                      height={64}
+                      sizes="64px"
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                    />
+                  </div>
+                ) : null}
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">

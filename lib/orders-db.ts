@@ -520,8 +520,8 @@ export async function calculateOrderFromDb(items: OrderCreationItem[], people: n
         );
         const meta = {
           name: dish.name,
-          min_g: fallbackDish?.min_g ?? 200,
-          max_g: fallbackDish?.max_g ?? 500,
+          min_g: fallbackDish?.min_g ?? 100,
+          max_g: fallbackDish?.max_g ?? 600,
           step_g: fallbackDish?.step_g ?? 50,
         };
         const valCheck = validateGramsForDish(meta, reqItem.grams, safePeople);

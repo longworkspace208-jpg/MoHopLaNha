@@ -140,26 +140,20 @@ export default function CartPage() {
               <article key={line.dish.id} className="py-6 first:pt-0">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white sm:h-20 sm:w-20 shadow-sm">
-                      {line.dish.image_url ? (
-                        line.dish.image_url.startsWith("http") ||
-                        line.dish.image_url.startsWith("/") ? (
-                          <Image
-                            src={line.dish.image_url}
-                            alt={line.dish.name}
-                            width={80}
-                            height={80}
-                            sizes="80px"
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
-                        )
-                      ) : (
-                        <span className="font-mono text-[10px] font-bold text-forest">MÓN</span>
-                      )}
-                    </div>
+                    {line.dish.image_url &&
+                    (line.dish.image_url.startsWith("http") || line.dish.image_url.startsWith("/")) ? (
+                      <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden border border-rule bg-white sm:h-20 sm:w-20 shadow-sm">
+                        <Image
+                          src={line.dish.image_url}
+                          alt={line.dish.name}
+                          width={80}
+                          height={80}
+                          sizes="80px"
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : null}
 
                     <div>
                       <h2 className="font-display text-xl font-semibold text-ink">

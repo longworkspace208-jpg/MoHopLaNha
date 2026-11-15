@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { calcDish } from "@/lib/nutrition";
+import { todayInVietnam } from "@/lib/menu-cache";
 
 type Row = { ingredientId: string; rawG: number };
 
@@ -59,7 +60,13 @@ export async function createDish(formData: FormData) {
 
   const { data: dish, error } = await db
     .from("dishes")
-    .insert({ name, price_vnd: price, image_url: imageUrl, yield_g: yieldG })
+    .insert({
+      name,
+      price_vnd: price,
+      image_url: imageUrl,
+      yield_g: yieldG,
+      approved: true,
+    })
     .select("id")
     .single();
 
@@ -76,17 +83,71 @@ export async function createDish(formData: FormData) {
     );
 
   if (itemError) throw new Error(itemError.message);
+
+  // Tự động gắn món vào thực đơn hôm nay nếu menu đã khởi tạo
+  const today = todayInVietnam();
+  const { data: todayMenuDay } = await db
+    .from("menu_days")
+    .select("id")
+    .eq("menu_date", today)
+    .maybeSingle();
+
+  if (todayMenuDay) {
+    await db.from("menu_dishes").upsert(
+      {
+        menu_day_id: todayMenuDay.id,
+        dish_id: dish.id,
+        portion_limit: 50,
+        step_g: 50,
+        min_g: 100,
+        max_g: 600,
+      },
+      { onConflict: "menu_day_id,dish_id", ignoreDuplicates: true }
+    );
+  }
+
+  revalidateTag("menu");
+  revalidatePath("/menu");
+  revalidatePath("/api/menu/today");
   revalidatePath("/admin/dishes");
+  revalidatePath("/admin/menu");
 }
 
 export async function approveDish(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id"));
   if (!id) throw new Error("Thiếu mã món.");
-  const { error } = await createServerSupabaseClient()
+  const db = createServerSupabaseClient();
+  const { error } = await db
     .from("dishes")
     .update({ approved: true })
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  const today = todayInVietnam();
+  const { data: todayMenuDay } = await db
+    .from("menu_days")
+    .select("id")
+    .eq("menu_date", today)
+    .maybeSingle();
+
+  if (todayMenuDay) {
+    await db.from("menu_dishes").upsert(
+      {
+        menu_day_id: todayMenuDay.id,
+        dish_id: id,
+        portion_limit: 50,
+        step_g: 50,
+        min_g: 100,
+        max_g: 600,
+      },
+      { onConflict: "menu_day_id,dish_id", ignoreDuplicates: true }
+    );
+  }
+
+  revalidateTag("menu");
+  revalidatePath("/menu");
+  revalidatePath("/api/menu/today");
   revalidatePath("/admin/dishes");
+  revalidatePath("/admin/menu");
 }

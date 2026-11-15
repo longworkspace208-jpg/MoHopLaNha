@@ -301,30 +301,20 @@ export function CustomerMenu({
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-4">
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-forest/30 bg-forest sm:h-20 sm:w-20">
-                        {dish.image_url ? (
-                          dish.image_url.startsWith("http") ||
-                          dish.image_url.startsWith("/") ? (
-                            <Image
-                              src={dish.image_url}
-                              alt={dish.name}
-                              width={80}
-                              height={80}
-                              sizes="(max-width: 640px) 64px, 80px"
-                              loading="lazy"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span className="grid h-full w-full place-items-center font-mono text-xs text-white">
-                              MÓN
-                            </span>
-                          )
-                        ) : (
-                          <span className="grid h-full w-full place-items-center font-mono text-xs text-white">
-                            MÓN
-                          </span>
-                        )}
-                      </div>
+                      {dish.image_url &&
+                      (dish.image_url.startsWith("http") || dish.image_url.startsWith("/")) ? (
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-forest/30 bg-forest sm:h-20 sm:w-20">
+                          <Image
+                            src={dish.image_url}
+                            alt={dish.name}
+                            width={80}
+                            height={80}
+                            sizes="(max-width: 640px) 64px, 80px"
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : null}
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-2.5">
