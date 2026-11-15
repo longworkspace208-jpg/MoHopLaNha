@@ -97,6 +97,24 @@ export default function CheckoutPage() {
       }
 
       clearCart();
+
+      // Lưu mã token vào lịch sử thiết bị để khách dễ dàng theo dõi
+      try {
+        const stored = JSON.parse(localStorage.getItem("mhln_my_orders") || "[]");
+        const nextList = [
+          {
+            publicToken: data.publicToken,
+            publicCode: data.publicCode,
+            customerName: customerName.trim(),
+            createdAt: new Date().toISOString(),
+          },
+          ...stored.filter((item: { publicToken?: string }) => item.publicToken !== data.publicToken),
+        ].slice(0, 10);
+        localStorage.setItem("mhln_my_orders", JSON.stringify(nextList));
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn localStorage
+      }
+
       router.push(`/payment/${data.publicToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra.");

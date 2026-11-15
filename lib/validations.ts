@@ -74,6 +74,17 @@ export const orderCreationSchema = z.object({
 });
 
 /**
+ * Schema tra cứu đơn hàng khách hàng (GET /api/orders/lookup hoặc POST /api/orders/lookup)
+ */
+export const orderLookupSchema = z.object({
+  query: z
+    .string({ message: "Vui lòng nhập số điện thoại hoặc mã đơn hàng." })
+    .trim()
+    .min(3, { message: "Từ khóa tra cứu tối thiểu 3 ký tự." })
+    .max(50, { message: "Từ khóa tra cứu tối đa 50 ký tự." }),
+});
+
+/**
  * Kiểm tra ràng buộc bước nhảy và khoảng gram của món ăn.
  * min_g và max_g trong DB là giới hạn cho 1 suất.
  * Khoảng cho phép của một dòng giỏ là min_g đến max_g × số người, và là bội số của step_g.

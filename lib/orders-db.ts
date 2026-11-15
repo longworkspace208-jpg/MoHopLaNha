@@ -992,6 +992,53 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
 }
 
 /**
+ * Lấy danh sách đơn hàng theo số điện thoại khách hàng
+ */
+export async function getOrdersByPhone(phone: string): Promise<OrderRecord[]> {
+  ensureDemoSeedLoaded();
+  await checkAndCancelExpiredOrders();
+  const cleanPhone = phone.trim().replace(/[\s.-]/g, "");
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createServerSupabaseClient();
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("phone", cleanPhone)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (orders && orders.length > 0) {
+        const orderIds = orders.map((o) => o.id);
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
+          .in("order_id", orderIds);
+
+        return orders.map((o) => {
+          const orderItems = (items ?? []).filter((i) => i.order_id === o.id);
+          return mapOrderRow(o as DbOrderRow, orderItems as DbOrderItemRow[]);
+        });
+      }
+      return [];
+    } catch (err) {
+      console.warn("Supabase getOrdersByPhone error, using fallback:", err);
+    }
+  }
+
+  const results: OrderRecord[] = [];
+  for (const order of globalFallback._fallbackOrders!.values()) {
+    if (order.phone.replace(/[\s.-]/g, "") === cleanPhone) {
+      results.push(order);
+    }
+  }
+  return results.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
+/**
  * Lấy chi tiết đơn hàng theo public_token (nanoid 21 ký tự) cho route khách hàng
  */
 export async function getOrderByPublicToken(token: string): Promise<OrderRecord | null> {

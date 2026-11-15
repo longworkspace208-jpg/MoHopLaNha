@@ -8,7 +8,8 @@ export type RateLimitRule =
   | "orders_phone"
   | "admin_login"
   | "order_status"
-  | "usda_search";
+  | "usda_search"
+  | "orders_lookup";
 
 export interface RateLimitResult {
   ok: boolean;
@@ -52,6 +53,12 @@ const RULE_CONFIGS: Record<RateLimitRule, RuleConfig> = {
     windowMs: 60 * 1000, // 1 phút
     upstashWindow: "1 m",
     prefix: "ratelimit:usda_search",
+  },
+  orders_lookup: {
+    limit: 20,
+    windowMs: 10 * 60 * 1000, // 10 phút
+    upstashWindow: "10 m",
+    prefix: "ratelimit:orders_lookup",
   },
 };
 
