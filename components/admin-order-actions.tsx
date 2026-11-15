@@ -133,7 +133,19 @@ export function AdminOrderActions({
         </button>
       )}
 
-      {/* 4. Đơn đã đóng gói -> Đã giao */}
+      {/* 4. Đơn đang nấu -> Đóng gói xong (Chờ giao) */}
+      {status === "cooking" && (
+        <button
+          type="button"
+          onClick={() => handleNextStatus("packed", "Đã đóng gói, chờ giao")}
+          disabled={loading}
+          className="rounded-xl bg-forest px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-forest/90 disabled:opacity-50"
+        >
+          {loading ? "Đang xử lý…" : "Đóng gói xong (Chờ giao)"}
+        </button>
+      )}
+
+      {/* 5. Đơn đã đóng gói -> Đang giao / Đã giao */}
       {status === "packed" && (
         <button
           type="button"
@@ -141,7 +153,7 @@ export function AdminOrderActions({
           disabled={loading}
           className="rounded-xl bg-forest px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-white shadow-sm transition hover:bg-forest/90 disabled:opacity-50"
         >
-          {loading ? "Đang xử lý…" : "Xác nhận đã giao"}
+          {loading ? "Đang xử lý…" : "Giao hàng (Xác nhận đã giao)"}
         </button>
       )}
 

@@ -4,12 +4,13 @@ import { getOrderById, updateOrderStatusWithTimestamp } from "@/lib/orders-db";
 import { orderStatusUpdateSchema, formatZodError } from "@/lib/validations";
 import type { OrderStatus } from "@/lib/types";
 
-const ADMIN_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
-  awaiting_payment: "paid",
-  pending_verification: "paid",
-  paid: "cooking",
-  cooking: "packed",
-  packed: "delivered",
+const ADMIN_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  awaiting_payment: ["paid", "cancelled"],
+  pending_verification: ["paid", "cancelled"],
+  paid: ["cooking", "packed", "delivered", "cancelled"],
+  cooking: ["packed", "delivered", "cancelled"],
+  packed: ["delivered", "cancelled"],
+  cancelled: ["paid"],
 };
 
 export async function POST(
@@ -45,8 +46,9 @@ export async function POST(
     }
 
     const newStatus = validation.data.status;
+    const allowed = ADMIN_TRANSITIONS[order.status] ?? [];
 
-    if (ADMIN_TRANSITIONS[order.status] !== newStatus) {
+    if (!allowed.includes(newStatus)) {
       return NextResponse.json(
         { error: `Không thể chuyển từ "${order.status}" sang "${newStatus}".` },
         { status: 409 }

@@ -141,6 +141,30 @@ const globalFallbackBatches = globalThis as unknown as {
   _fallbackPortions?: Map<string, PortionSnapshot>;
 };
 
+type SeedOrder = {
+  id: string;
+  publicCode: string;
+  publicToken?: string;
+  customerName: string;
+  phone: string;
+  customerEmail?: string | null;
+  deliveryAddress: string;
+  note?: string | null;
+  status: OrderStatus;
+  items: Array<{ dishId: string; grams: number }>;
+  people?: number;
+  goal?: string | null;
+  portionSnapshot?: {
+    id: string;
+    qrCode: string;
+    dishId: string;
+    actualGrams: number;
+    lotCode: string;
+    sourceNote: string;
+    cookedBatchId: string;
+  };
+};
+
 export function resetFallbackDemoData(): void {
   const dishes = buildFallbackDishes();
   const dishById = new Map(dishes.map((d) => [d.id, d]));
@@ -165,11 +189,13 @@ export function resetFallbackDemoData(): void {
     });
   }
 
-  for (let idx = 0; idx < demoSeed.orders.length; idx++) {
-    const spec = demoSeed.orders[idx];
+  const seedOrders: SeedOrder[] = (demoSeed.orders as unknown as SeedOrder[]) || [];
+
+  for (let idx = 0; idx < seedOrders.length; idx++) {
+    const spec = seedOrders[idx];
     const orderTimeMs = Math.max(
       todayStartMs + (idx + 1) * 1000,
-      nowMs - (demoSeed.orders.length - idx) * 900_000
+      nowMs - (seedOrders.length - idx) * 900_000
     );
     const createdAt = new Date(orderTimeMs).toISOString();
     let subtotal = 0;
@@ -214,7 +240,7 @@ export function resetFallbackDemoData(): void {
 
     orders.set(spec.id, {
       id: spec.id,
-      public_token: (spec as { publicToken?: string }).publicToken || `tok_demo_${spec.publicCode.toLowerCase()}`,
+      public_token: spec.publicToken || `tok_demo_${spec.publicCode.toLowerCase()}`,
       public_code: spec.publicCode,
       customer_name: spec.customerName,
       phone: spec.phone,
@@ -618,27 +644,55 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          id: orderId,
+
+      const basePayload: Record<string, unknown> = {
+        id: orderId,
+        public_code: publicCode,
+        customer_name: input.customerName,
+        phone: input.phone,
+        customer_email: input.customerEmail || null,
+        delivery_address: input.deliveryAddress,
+        note: input.note || null,
+        status: "awaiting_payment",
+        shipping_fee_vnd: calculated.shippingFee,
+        total_vnd: calculated.total,
+        nutrition_snapshot: {
+          ...calculated.nutrition,
           public_token: publicToken,
-          public_code: publicCode,
-          customer_name: input.customerName,
-          phone: input.phone,
-          customer_email: input.customerEmail || null,
-          delivery_address: input.deliveryAddress,
-          note: input.note || null,
-          status: "awaiting_payment",
-          shipping_fee_vnd: calculated.shippingFee,
-          total_vnd: calculated.total,
-          nutrition_snapshot: calculated.nutrition,
+          expires_at: expiresAt,
           people: safePeople,
           goal: input.goal || null,
-          expires_at: expiresAt,
-        })
-        .select("id, public_code, public_token, expires_at")
+        },
+      };
+
+      const extendedPayload: Record<string, unknown> = {
+        ...basePayload,
+        public_token: publicToken,
+        people: safePeople,
+        goal: input.goal || null,
+        expires_at: expiresAt,
+      };
+
+      let insertResult = await supabase
+        .from("orders")
+        .insert(extendedPayload)
+        .select("id, public_code")
         .single();
+
+      if (
+        insertResult.error &&
+        (insertResult.error.message.includes("column") ||
+          insertResult.error.code === "PGRST204" ||
+          insertResult.error.code === "42703")
+      ) {
+        insertResult = await supabase
+          .from("orders")
+          .insert(basePayload)
+          .select("id, public_code")
+          .single();
+      }
+
+      const { data: order, error: orderError } = insertResult;
 
       if (orderError || !order) {
         throw new Error(orderError?.message ?? "Không thể lưu đơn hàng vào database.");
@@ -647,7 +701,7 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
       const { error: itemsError } = await supabase.from("order_items").insert(
         calculated.items.map((item) => ({
           order_id: order.id,
-          dish_id: item.dishId,
+          dish_id: resolveDishDbId(item.dishId),
           name_snapshot: item.name,
           unit_price_vnd: item.unitPrice,
           quantity: 1,
@@ -664,7 +718,7 @@ export async function createOrderInDb(input: OrderCreationInput & { publicToken?
       }
 
       await recordOrderEvent(order.id, null, "awaiting_payment", "customer", "Khách tạo đơn hàng");
-      return { orderId: order.id, publicCode: order.public_code, publicToken: order.public_token || publicToken, expiresAt };
+      return { orderId: order.id, publicCode: order.public_code, publicToken, expiresAt };
     } catch (err) {
       console.warn("Supabase order creation failed, persisting to fallback:", err);
     }
@@ -745,9 +799,29 @@ function mapOrderRow(order: DbOrderRow, items: DbOrderItemRow[]): OrderRecord {
     nutrition: it.nutrition_snapshot
   }));
 
+  const snap = (order.nutrition_snapshot || {}) as Record<string, unknown>;
+  const publicToken =
+    order.public_token ||
+    (typeof snap.public_token === "string" ? snap.public_token : null) ||
+    order.id;
+  const expiresAt =
+    order.expires_at ||
+    (typeof snap.expires_at === "string" ? snap.expires_at : null) ||
+    null;
+  const cancelReason =
+    order.cancel_reason ||
+    (typeof snap.cancel_reason === "string" ? snap.cancel_reason : null) ||
+    null;
+  const people = order.people
+    ? Number(order.people)
+    : snap.people
+      ? Number(snap.people)
+      : 1;
+  const goal = order.goal || (typeof snap.goal === "string" ? snap.goal : null);
+
   return {
     id: order.id,
-    public_token: order.public_token || order.id,
+    public_token: publicToken,
     public_code: order.public_code,
     customer_name: order.customer_name,
     phone: order.phone,
@@ -759,12 +833,12 @@ function mapOrderRow(order: DbOrderRow, items: DbOrderItemRow[]): OrderRecord {
     shipping_fee_vnd: order.shipping_fee_vnd ?? 0,
     total_vnd: order.total_vnd,
     nutrition_snapshot: order.nutrition_snapshot,
-    people: order.people ? Number(order.people) : 1,
-    goal: order.goal ?? null,
+    people,
+    goal,
     items: itemSnapshots,
     created_at: order.created_at,
-    expires_at: order.expires_at ?? null,
-    cancel_reason: order.cancel_reason ?? null,
+    expires_at: expiresAt,
+    cancel_reason: cancelReason,
     paid_at: order.paid_at,
     cooking_at: order.cooking_at ?? null,
     packed_at: order.packed_at ?? null,
@@ -792,7 +866,7 @@ export async function getAllOrders(statusFilter?: string): Promise<OrderRecord[]
       const supabase = createServerSupabaseClient();
       let query = supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (isPendingReview) {
@@ -864,7 +938,7 @@ export async function getOrderById(orderId: string): Promise<OrderRecord | null>
       const [{ data: order }, { data: items }] = await Promise.all([
         supabase
           .from("orders")
-          .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
+          .select("*")
           .eq("id", orderId)
           .maybeSingle(),
         supabase
@@ -894,7 +968,7 @@ export async function getOrderByCode(code: string): Promise<OrderRecord | null> 
       const supabase = createServerSupabaseClient();
       const { data: order } = await supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
+        .select("*")
         .eq("public_code", code)
         .maybeSingle();
 
@@ -927,11 +1001,29 @@ export async function getOrderByPublicToken(token: string): Promise<OrderRecord 
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
-      const { data: order } = await supabase
+      let order: DbOrderRow | null = null;
+
+      // 1. Check in nutrition_snapshot JSONB
+      const byJsonb = await supabase
         .from("orders")
-        .select("id, public_token, public_code, customer_name, phone, customer_email, delivery_address, note, status, total_vnd, shipping_fee_vnd, nutrition_snapshot, created_at, paid_at, cooking_at, packed_at, delivered_at, expires_at, cancel_reason, people, goal")
-        .eq("public_token", token)
+        .select("*")
+        .eq("nutrition_snapshot->>public_token", token)
         .maybeSingle();
+      if (byJsonb.data) order = byJsonb.data as DbOrderRow;
+
+      // 2. If not found, try checking column public_token
+      if (!order) {
+        try {
+          const byCol = await supabase
+            .from("orders")
+            .select("*")
+            .eq("public_token", token)
+            .maybeSingle();
+          if (byCol.data) order = byCol.data as DbOrderRow;
+        } catch {
+          // ignore column error
+        }
+      }
 
       if (order) {
         const { data: items } = await supabase
@@ -939,7 +1031,7 @@ export async function getOrderByPublicToken(token: string): Promise<OrderRecord 
           .select("id, order_id, dish_id, name_snapshot, unit_price_vnd, quantity, nutrition_snapshot")
           .eq("order_id", order.id);
 
-        return mapOrderRow(order as DbOrderRow, (items ?? []) as DbOrderItemRow[]);
+        return mapOrderRow(order, (items ?? []) as DbOrderItemRow[]);
       }
     } catch (err) {
       console.warn("Supabase getOrderByPublicToken error, using fallback:", err);
@@ -947,7 +1039,9 @@ export async function getOrderByPublicToken(token: string): Promise<OrderRecord 
   }
 
   for (const order of globalFallback._fallbackOrders!.values()) {
-    if (order.public_token === token) return order;
+    if (order.public_token === token) {
+      return order;
+    }
   }
   return null;
 }
@@ -1104,10 +1198,11 @@ export async function checkAndCancelExpiredOrders(): Promise<number> {
 
 const ALLOWED_STATUS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   awaiting_payment: ["pending_verification", "paid", "cancelled"],
-  pending_verification: ["paid"],
-  paid: ["cooking"],
-  cooking: ["packed"],
-  packed: ["delivered"],
+  pending_verification: ["paid", "cancelled"],
+  paid: ["cooking", "packed", "delivered", "cancelled"],
+  cooking: ["packed", "delivered", "cancelled"],
+  packed: ["delivered", "cancelled"],
+  delivered: [],
   cancelled: ["paid"], // Chỉ khi cancel_reason === 'expired' và do admin khôi phục
 };
 
@@ -1183,24 +1278,42 @@ export async function transitionOrderStatus(
       ? options?.cancelReason ?? current.cancel_reason ?? "other"
       : null;
 
-  const payload: Record<string, unknown> = {
+  const basePayload: Record<string, unknown> = {
     status: newStatus,
-    cancel_reason: updatedCancelReason,
   };
   if (tsField) {
-    payload[tsField] = now;
+    basePayload[tsField] = now;
   }
 
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
-      let query = supabase.from("orders").update(payload).eq("id", orderId);
+      const extendedPayload: Record<string, unknown> = {
+        ...basePayload,
+        cancel_reason: updatedCancelReason,
+      };
+
+      let query = supabase.from("orders").update(extendedPayload).eq("id", orderId);
       if (options?.expectedCurrentStatuses && options.expectedCurrentStatuses.length > 0) {
         query = query.in("status", options.expectedCurrentStatuses);
       }
-      const { data, error } = await query.select("id, status").maybeSingle();
-      if (error) throw error;
-      if (!data) {
+      let updateResult = await query.select("id, status").maybeSingle();
+
+      if (
+        updateResult.error &&
+        (updateResult.error.message.includes("column") ||
+          updateResult.error.code === "PGRST204" ||
+          updateResult.error.code === "42703")
+      ) {
+        let retryQuery = supabase.from("orders").update(basePayload).eq("id", orderId);
+        if (options?.expectedCurrentStatuses && options.expectedCurrentStatuses.length > 0) {
+          retryQuery = retryQuery.in("status", options.expectedCurrentStatuses);
+        }
+        updateResult = await retryQuery.select("id, status").maybeSingle();
+      }
+
+      if (updateResult.error) throw updateResult.error;
+      if (!updateResult.data) {
         return {
           ok: false,
           conflict: true,
