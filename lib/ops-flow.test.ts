@@ -7,6 +7,7 @@ import {
   getOrderById,
   getPortionByQrCode,
   getPortionsByOrder,
+  getFallbackDishes,
   OutOfStockError,
   resetFallbackDemoData,
   saveCookingBatch,
@@ -260,13 +261,21 @@ describe("Ops Workflow Lifecycle (paid -> cooking -> packed -> delivered)", () =
     expect(packedSnap).not.toBeNull();
     expect(packedSnap?.lotCode).toBe("LOT-DEMO-GA-01");
 
-    await expect(
-      createOrderInDb({
-        customerName: "Sold Out Test",
-        phone: "0901234567",
-        deliveryAddress: "12 Nguyễn Huệ, Quận 1",
-        items: [{ dishId: "bo-ap-chao-mang-tay", grams: 350 }],
-      })
-    ).rejects.toThrow(OutOfStockError);
+    const dishes = getFallbackDishes();
+    const targetDish = dishes[0];
+    const originalLimit = targetDish.portion_limit;
+    targetDish.portion_limit = 0;
+    try {
+      await expect(
+        createOrderInDb({
+          customerName: "Sold Out Test",
+          phone: "0901234567",
+          deliveryAddress: "12 Nguyễn Huệ, Quận 1",
+          items: [{ dishId: targetDish.id, grams: 350 }],
+        })
+      ).rejects.toThrow(OutOfStockError);
+    } finally {
+      targetDish.portion_limit = originalLimit;
+    }
   });
 });

@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartStore, sanitizeCartLine, type CartLine } from "@/lib/cart-store";
 import { formatVnd } from "@/lib/format";
 import { DELIVERY_CONFIG, validateServiceArea } from "@/lib/delivery-config";
-import { TurnstileWidget } from "@/components/turnstile-widget";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -22,7 +21,6 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
 
   const [touchedAddress, setTouchedAddress] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -32,14 +30,21 @@ export default function CheckoutPage() {
     setMounted(true);
   }, []);
 
-  const subtotal = useMemo(() => {
-    return lines.reduce((sum, line) => {
-      const price = (line.dish.price_vnd / line.dish.yield_g) * line.grams;
-      return sum + price;
-    }, 0);
-  }, [lines]);
+  const validLines = useMemo(() => {
+    return lines
+      .map((line) => sanitizeCartLine(line, people))
+      .filter((line): line is CartLine => Boolean(line));
+  }, [lines, people]);
 
-  const shippingFee = lines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
+  const subtotal = useMemo(() => {
+    return validLines.reduce((sum, line) => {
+      const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
+      const price = (line.dish.price_vnd / yieldG) * line.grams;
+      return sum + (Number.isFinite(price) ? price : 0);
+    }, 0);
+  }, [validLines]);
+
+  const shippingFee = validLines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
   const total = subtotal + shippingFee;
 
   const addressValidation = useMemo(() => {
@@ -56,16 +61,11 @@ export default function CheckoutPage() {
     isPhoneValid &&
     address.trim().length >= 5 &&
     addressValidation.inService &&
-    lines.length > 0;
+    validLines.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isFormValid || submitting) return;
-
-    if (!turnstileToken) {
-      setError("Vui lòng hoàn tất xác thực chống bot (Cloudflare Turnstile) trước khi đặt hàng.");
-      return;
-    }
 
     setSubmitting(true);
     setError("");
@@ -77,10 +77,9 @@ export default function CheckoutPage() {
         address: address.trim(),
         email: email.trim() || undefined,
         note: note.trim() || undefined,
-        turnstileToken: turnstileToken,
         people: people,
         goal: goal,
-        lines: lines.map((line) => ({
+        lines: validLines.map((line) => ({
           dishId: line.dish.id,
           grams: line.grams,
         })),
@@ -294,14 +293,15 @@ export default function CheckoutPage() {
         <aside className="space-y-5 lg:sticky lg:top-24 lg:col-span-5">
           <section className="bg-forest p-6 text-white shadow-sm">
             <h2 className="border-b border-white/20 pb-3 font-display text-xl font-semibold text-white">
-              Món đã chọn ({lines.length} món)
+              Món đã chọn ({validLines.length} món)
             </h2>
 
             <div className="divide-y divide-white/10">
-              {lines.map((line) => {
+              {validLines.map((line) => {
                 const itemGrams = line.grams;
+                const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
                 const itemPrice = Math.round(
-                  (line.dish.price_vnd / line.dish.yield_g) * itemGrams
+                  (line.dish.price_vnd / yieldG) * itemGrams
                 );
                 return (
                   <div
@@ -326,7 +326,7 @@ export default function CheckoutPage() {
 
             <div className="mt-2 space-y-2.5 border-t border-white/15 pt-4 text-sm text-ivory/80">
               <div className="flex justify-between">
-                <span>Tạm tính ({lines.length} món · bàn {people} người)</span>
+                <span>Tạm tính ({validLines.length} món · bàn {people} người)</span>
                 <span className="font-mono font-bold tabular-nums text-white">
                   {formatVnd(Math.round(subtotal))}
                 </span>
@@ -344,37 +344,6 @@ export default function CheckoutPage() {
                 <span className="font-display text-3xl font-bold text-coral">
                   {formatVnd(Math.round(total))}
                 </span>
-              </div>
-            </div>
-
-            <div className="mt-4 border-t border-white/15 pt-4">
-              <div className="mb-2 flex items-center justify-between text-xs text-ivory/80">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
-                  Xác minh chống bot
-                </span>
-                {turnstileToken ? (
-                  <span className="font-mono text-[11px] font-semibold text-emerald-300">
-                    ✓ Đã xác thực
-                  </span>
-                ) : (
-                  <span className="font-mono text-[11px] text-ivory/60">
-                    Chờ xác minh…
-                  </span>
-                )}
-              </div>
-              <div className="flex justify-center rounded bg-white/5 p-2 backdrop-blur-sm">
-                <TurnstileWidget
-                  onVerify={(tok) => {
-                    setTurnstileToken(tok);
-                    setError("");
-                  }}
-                  onError={(err) => {
-                    setError(err || "Lỗi xác thực chống bot.");
-                  }}
-                  onExpire={() => {
-                    setTurnstileToken("");
-                  }}
-                />
               </div>
             </div>
 
@@ -396,7 +365,7 @@ export default function CheckoutPage() {
 
             <button
               type="submit"
-              disabled={!isFormValid || submitting || !turnstileToken}
+              disabled={!isFormValid || submitting}
               className="mt-6 flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span>

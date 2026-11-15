@@ -408,13 +408,13 @@ async function main() {
 
   console.log(`\n[seed:demo] Đã reset dữ liệu demo thành công (mode: ${mode})`);
   console.log(`- Nguyên liệu: ${seed.ingredients.length}`);
-  console.log(`- Món ăn: ${seed.dishes.length} (gồm 1 món hết suất hôm nay: "Bò áp chảo măng tây")`);
+  console.log(`- Món ăn thực tế: ${seed.dishes.length} món`);
   console.log(`- Mẻ chế biến: ${seed.cookingBatches.length}`);
   console.log(`- Đơn mẫu (1 đơn ở mỗi trạng thái): ${seed.orders.length}`);
   for (const o of seed.orders) {
     console.log(`  · ${o.publicCode} [${o.status}] — ${o.customerName}`);
   }
-  console.log(`- Trang QR mẫu sẵn sàng quét: /n/MHLN1005-GA-001 và /n/MHLN1006-BO-001\n`);
+  console.log(`- Trang QR mẫu sẵn sàng quét: /n/MHLN1005-GA-001 và /n/MHLN1006-HEO-001\n`);
 }
 
 main().catch((err) => {

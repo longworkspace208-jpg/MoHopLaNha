@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCartStore, roundToStep } from "@/lib/cart-store";
+import { useCartStore, roundToStep, sanitizeCartLine, type CartLine } from "@/lib/cart-store";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
 import { DELIVERY_CONFIG } from "@/lib/delivery-config";
@@ -22,6 +22,38 @@ export default function CartPage() {
     setMounted(true);
   }, []);
 
+  const validLines = useMemo(() => {
+    return lines
+      .map((line) => sanitizeCartLine(line, people))
+      .filter((line): line is CartLine => Boolean(line));
+  }, [lines, people]);
+
+  const subtotal = useMemo(() => {
+    return validLines.reduce((sum, line) => {
+      const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
+      const itemPrice = (line.dish.price_vnd / yieldG) * line.grams;
+      return sum + (Number.isFinite(itemPrice) ? itemPrice : 0);
+    }, 0);
+  }, [validLines]);
+
+  const totalNutrition = useMemo(() => {
+    return validLines.reduce(
+      (total, line) => {
+        const macro = calcPortion(line.dish.nutrition_per100, line.grams);
+        return {
+          kcal: total.kcal + (Number.isFinite(macro.kcal) ? macro.kcal : 0),
+          protein: total.protein + (Number.isFinite(macro.protein) ? macro.protein : 0),
+          carbs: total.carbs + (Number.isFinite(macro.carbs) ? macro.carbs : 0),
+          fat: total.fat + (Number.isFinite(macro.fat) ? macro.fat : 0),
+        };
+      },
+      { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+  }, [validLines]);
+
+  const shippingFee = validLines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
+  const finalTotal = subtotal + shippingFee;
+
   if (!mounted) {
     return (
       <main className="mx-auto min-h-screen max-w-6xl px-4 py-16 sm:px-6 lg:px-10">
@@ -32,28 +64,7 @@ export default function CartPage() {
     );
   }
 
-  const subtotal = lines.reduce((sum, line) => {
-    const itemPrice = (line.dish.price_vnd / line.dish.yield_g) * line.grams;
-    return sum + itemPrice;
-  }, 0);
-
-  const totalNutrition = lines.reduce(
-    (total, line) => {
-      const macro = calcPortion(line.dish.nutrition_per100, line.grams);
-      return {
-        kcal: total.kcal + macro.kcal,
-        protein: total.protein + macro.protein,
-        carbs: total.carbs + macro.carbs,
-        fat: total.fat + macro.fat,
-      };
-    },
-    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-  const shippingFee = lines.length > 0 ? DELIVERY_CONFIG.shippingFeeVnd : 0;
-  const finalTotal = subtotal + shippingFee;
-
-  if (lines.length === 0) {
+  if (validLines.length === 0) {
     return (
       <main className="mx-auto min-h-screen max-w-2xl px-4 py-16 sm:px-6">
         <div className="border border-rule bg-white p-8 text-center shadow-sm sm:p-12">
@@ -107,19 +118,21 @@ export default function CartPage() {
       <div className="mt-8 grid gap-10 lg:grid-cols-12 lg:items-start">
         {/* Cột trái: Danh sách món ngăn cách bởi hairline */}
         <section className="divide-y divide-rule border-b border-rule lg:col-span-7">
-          {lines.map((line) => {
-            const grams = line.grams;
+          {validLines.map((line) => {
+            const grams = Number.isFinite(line.grams) && line.grams > 0 ? line.grams : (line.dish.min_g || 200);
+            const stepG = line.dish.step_g > 0 ? line.dish.step_g : 50;
+            const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
             const suggestedGrams = roundToStep(
-              (line.baseGrams ?? line.dish.min_g) * people,
-              line.dish.step_g
+              (line.baseGrams ?? line.dish.min_g ?? 200) * people,
+              stepG
             );
             const nutrition = calcPortion(line.dish.nutrition_per100, grams);
             const price = Math.round(
-              (line.dish.price_vnd / line.dish.yield_g) * grams
+              (line.dish.price_vnd / yieldG) * grams
             );
 
-            const minG = line.dish.min_g;
-            const maxG = line.dish.max_g * people;
+            const minG = line.dish.min_g > 0 ? line.dish.min_g : 200;
+            const maxG = (line.dish.max_g >= minG ? line.dish.max_g : 500) * people;
             const canDecrease = grams > minG;
             const canIncrease = grams < maxG;
 
@@ -178,10 +191,10 @@ export default function CartPage() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
                   {/* Bảng macro dạng inline monospace */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs tabular-nums text-muted">
-                    <span>{Math.round(nutrition.kcal)} kcal</span>
-                    <span className="text-forest font-semibold">P {nutrition.protein.toFixed(1)}g</span>
-                    <span>C {nutrition.carbs.toFixed(1)}g</span>
-                    <span>F {nutrition.fat.toFixed(1)}g</span>
+                    <span>{Math.round(nutrition.kcal || 0)} kcal</span>
+                    <span className="text-forest font-semibold">P {(nutrition.protein ?? 0).toFixed(1)}g</span>
+                    <span>C {(nutrition.carbs ?? 0).toFixed(1)}g</span>
+                    <span>F {(nutrition.fat ?? 0).toFixed(1)}g</span>
                   </div>
 
                   {/* Bộ tăng giảm gram kiểu editorial */}
@@ -191,7 +204,7 @@ export default function CartPage() {
                       onClick={() =>
                         changeGrams(
                           line.dish.id,
-                          Math.max(minG, grams - line.dish.step_g),
+                          Math.max(minG, grams - stepG),
                           true
                         )
                       }
@@ -209,7 +222,7 @@ export default function CartPage() {
                       onClick={() =>
                         changeGrams(
                           line.dish.id,
-                          Math.min(maxG, grams + line.dish.step_g),
+                          Math.min(maxG, grams + stepG),
                           true
                         )
                       }
@@ -239,7 +252,7 @@ export default function CartPage() {
                   Calories
                 </dt>
                 <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
-                  {Math.round(totalNutrition.kcal)} kcal
+                  {Math.round(totalNutrition.kcal || 0)} kcal
                 </dd>
               </div>
               <div>
@@ -247,7 +260,7 @@ export default function CartPage() {
                   Protein
                 </dt>
                 <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-forest">
-                  {totalNutrition.protein.toFixed(1)}g
+                  {(totalNutrition.protein ?? 0).toFixed(1)}g
                 </dd>
               </div>
               <div>
@@ -255,7 +268,7 @@ export default function CartPage() {
                   Carbs
                 </dt>
                 <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-ink">
-                  {totalNutrition.carbs.toFixed(1)}g
+                  {(totalNutrition.carbs ?? 0).toFixed(1)}g
                 </dd>
               </div>
               <div>
@@ -263,12 +276,12 @@ export default function CartPage() {
                   Fat
                 </dt>
                 <dd className="mt-0.5 font-mono text-lg font-bold tabular-nums text-coral">
-                  {totalNutrition.fat.toFixed(1)}g
+                  {(totalNutrition.fat ?? 0).toFixed(1)}g
                 </dd>
               </div>
             </dl>
             <div className="mt-4 border-t border-rule pt-2.5 font-mono text-[11px] text-muted leading-relaxed">
-              Bình quân mỗi người nếu chia đều ({people} người): {formatVnd(Math.round(subtotal / people))} · {Math.round(totalNutrition.kcal / people)} kcal · P {(totalNutrition.protein / people).toFixed(1)}g (ước tính)
+              Bình quân mỗi người nếu chia đều ({people} người): {formatVnd(Math.round(subtotal / Math.max(1, people)))} · {Math.round((totalNutrition.kcal || 0) / Math.max(1, people))} kcal · P {(((totalNutrition.protein || 0) / Math.max(1, people))).toFixed(1)}g (ước tính)
             </div>
           </section>
 

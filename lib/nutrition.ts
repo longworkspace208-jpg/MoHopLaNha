@@ -18,9 +18,25 @@ export function calcDish(items: RecipeItem[], yield_g: number): Macros {
 }
 
 /** Converts a nutritional profile per 100 g into one portion in grams. */
-export function calcPortion(per100: Macros, grams: number): Macros {
-  if (!Number.isFinite(grams) || grams < 0) throw new Error("Khối lượng phần ăn không hợp lệ.");
-  return { kcal: per100.kcal * grams / 100, protein: per100.protein * grams / 100, carbs: per100.carbs * grams / 100, fat: per100.fat * grams / 100 };
+export function calcPortion(
+  per100: Partial<Macros> | undefined | null,
+  grams: number
+): Macros {
+  if (!Number.isFinite(grams) || grams < 0) {
+    return { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  }
+  const safePer100 = {
+    kcal: Number(per100?.kcal) || 0,
+    protein: Number(per100?.protein) || 0,
+    carbs: Number(per100?.carbs) || 0,
+    fat: Number(per100?.fat) || 0,
+  };
+  return {
+    kcal: (safePer100.kcal * grams) / 100,
+    protein: (safePer100.protein * grams) / 100,
+    carbs: (safePer100.carbs * grams) / 100,
+    fat: (safePer100.fat * grams) / 100,
+  };
 }
 
 export type CalculatedOrder = { items: Array<{ dishId: string; name: string; unitPrice: number; quantity: number; subtotal: number; nutrition: Nutrition }>; total: number; nutrition: Nutrition };

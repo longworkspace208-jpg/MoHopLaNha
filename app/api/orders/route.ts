@@ -97,22 +97,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Xác minh chống bot Cloudflare Turnstile (ngoại trừ admin tạo đơn thủ công)
-    const isFacebookAdmin = validData.source === "facebook" && (await isAdmin());
-    if (!isFacebookAdmin) {
-      const turnstileToken =
-        typeof body.turnstileToken === "string" ? body.turnstileToken : undefined;
-      const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
-      if (!turnstileResult.success) {
-        return NextResponse.json(
-          {
-            error:
-              turnstileResult.error ||
-              "Xác minh chống bot (Cloudflare Turnstile) không thành công. Vui lòng thử lại.",
-            code: "TURNSTILE_FAILED",
-          },
-          { status: 400 }
-        );
+    // 5. Xác minh chống bot Cloudflare Turnstile (nếu có cấu hình và gửi kèm token)
+    const turnstileToken =
+      typeof body.turnstileToken === "string" && body.turnstileToken.trim().length > 0
+        ? body.turnstileToken.trim()
+        : undefined;
+
+    if (process.env.ENABLE_TURNSTILE === "true" && turnstileToken) {
+      const isFacebookAdmin = validData.source === "facebook" && (await isAdmin());
+      if (!isFacebookAdmin) {
+        const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIp);
+        if (!turnstileResult.success) {
+          return NextResponse.json(
+            {
+              error:
+                turnstileResult.error ||
+                "Xác minh chống bot không thành công. Vui lòng thử lại.",
+              code: "TURNSTILE_FAILED",
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 

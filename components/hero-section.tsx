@@ -61,6 +61,12 @@ export function HeroSection({ dishes }: HeroSectionProps) {
           const map: Record<string, MenuDish> = {};
           for (const d of data.dishes as MenuDish[]) {
             map[d.id] = d;
+            const matched = dishes.find(
+              (item) => item.title === d.name || item.shortName === d.name
+            );
+            if (matched) {
+              map[matched.id] = d;
+            }
           }
           setLiveMenuDishes(map);
         }
@@ -71,7 +77,7 @@ export function HeroSection({ dishes }: HeroSectionProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dishes]);
 
   if (!active) return null;
 

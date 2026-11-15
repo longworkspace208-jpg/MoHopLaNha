@@ -424,6 +424,24 @@ async function getSupabaseTodayMenuLimits(dishIds: string[]): Promise<Map<string
   }
 }
 
+export const DISH_SLUG_TO_ID: Record<string, string> = {
+  "ga-nuong-com-gao-lut": "22222222-2222-4222-8222-000000000001",
+  "ca-hoi-sot-chanh": "22222222-2222-4222-8222-000000000002",
+  "dau-hu-nam-hat": "22222222-2222-4222-8222-000000000003",
+  "thit-kho-trung-gao-lut": "22222222-2222-4222-8222-000000000004",
+};
+
+export const DISH_ID_TO_SLUG: Record<string, string> = {
+  "22222222-2222-4222-8222-000000000001": "ga-nuong-com-gao-lut",
+  "22222222-2222-4222-8222-000000000002": "ca-hoi-sot-chanh",
+  "22222222-2222-4222-8222-000000000003": "dau-hu-nam-hat",
+  "22222222-2222-4222-8222-000000000004": "thit-kho-trung-gao-lut",
+};
+
+export function resolveDishDbId(idOrSlug: string): string {
+  return DISH_SLUG_TO_ID[idOrSlug] || idOrSlug;
+}
+
 /**
  * Tính toán lại giá và dinh dưỡng từ Database hoặc Fallback
  */
@@ -442,24 +460,25 @@ export async function calculateOrderFromDb(items: OrderCreationItem[], people: n
   if (isSupabaseConfigured()) {
     try {
       const supabase = createServerSupabaseClient();
-      const dishIds = items.map((i) => i.dishId);
+      const resolvedDishIds = items.map((i) => resolveDishDbId(i.dishId));
 
       const [{ data: dishes, error: dishError }, { data: recipeRows }, remainingMap] =
         await Promise.all([
-          supabase.from("dishes").select("id, name, price_vnd, yield_g, approved").in("id", dishIds),
+          supabase.from("dishes").select("id, name, price_vnd, yield_g, approved").in("id", resolvedDishIds),
           supabase
             .from("dish_ingredients")
             .select("dish_id, raw_g, ingredients(kcal_per100, protein_per100, carbs_per100, fat_per100)")
-            .in("dish_id", dishIds),
-          getSupabaseTodayMenuLimits(dishIds)
+            .in("dish_id", resolvedDishIds),
+          getSupabaseTodayMenuLimits(resolvedDishIds)
         ]);
 
-      if (dishError || !dishes || dishes.length !== dishIds.length) {
+      if (dishError || !dishes || dishes.length !== resolvedDishIds.length) {
         throw new Error("Không thể tải thông tin món ăn từ database.");
       }
 
       for (const reqItem of items) {
-        const dish = dishes.find((d) => d.id === reqItem.dishId);
+        const resolvedId = resolveDishDbId(reqItem.dishId);
+        const dish = dishes.find((d) => d.id === resolvedId);
         if (!dish || !dish.approved) {
           throw new Error(`Món ăn ${reqItem.dishId} chưa được duyệt hoặc không tồn tại.`);
         }
@@ -470,12 +489,14 @@ export async function calculateOrderFromDb(items: OrderCreationItem[], people: n
           throw new Error(`Khối lượng phần ăn ${dish.name} không hợp lệ.`);
         }
 
-        const fallbackDish = fallbackDishes.find((d) => d.id === dish.id);
+        const fallbackDish = fallbackDishes.find(
+          (d) => d.id === reqItem.dishId || d.id === resolvedId || (d as { supabaseId?: string }).supabaseId === resolvedId
+        );
         const meta = {
           name: dish.name,
-          min_g: fallbackDish?.min_g ?? 50,
-          max_g: fallbackDish?.max_g ?? 250,
-          step_g: fallbackDish?.step_g ?? 10,
+          min_g: fallbackDish?.min_g ?? 200,
+          max_g: fallbackDish?.max_g ?? 500,
+          step_g: fallbackDish?.step_g ?? 50,
         };
         const valCheck = validateGramsForDish(meta, reqItem.grams, safePeople);
         if (!valCheck.valid) {
@@ -535,7 +556,10 @@ export async function calculateOrderFromDb(items: OrderCreationItem[], people: n
   const orderedCounts = getFallbackTodayOrderedCounts();
 
   for (const reqItem of items) {
-    const dish = fallbackDishes.find((d) => d.id === reqItem.dishId);
+    const resolvedId = resolveDishDbId(reqItem.dishId);
+    const dish = fallbackDishes.find(
+      (d) => d.id === reqItem.dishId || d.id === resolvedId || (d as { supabaseId?: string }).supabaseId === resolvedId
+    );
     if (!dish) {
       throw new Error(`Món ăn ${reqItem.dishId} không tìm thấy trong thực đơn.`);
     }

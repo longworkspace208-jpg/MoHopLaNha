@@ -1,31 +1,41 @@
 "use client";
 
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { calcPortion } from "@/lib/nutrition";
 import { formatVnd } from "@/lib/format";
-import { useCartStore, roundToStep } from "@/lib/cart-store";
+import { useCartStore, roundToStep, sanitizeCartLine, type CartLine } from "@/lib/cart-store";
 
 export function MealCustomizer() {
   const people = useCartStore((state) => state.people);
   const lines = useCartStore((state) => state.lines);
   const changeGrams = useCartStore((state) => state.changeGrams);
 
-  const totals = lines.reduce(
-    (total, line) => {
-      const grams = line.grams;
-      const nutrition = calcPortion(line.dish.nutrition_per100, grams);
-      const price = (line.dish.price_vnd / line.dish.yield_g) * grams;
-      return {
-        price: total.price + price,
-        kcal: total.kcal + nutrition.kcal,
-        protein: total.protein + nutrition.protein,
-      };
-    },
-    { price: 0, kcal: 0, protein: 0 }
-  );
+  const validLines = useMemo(() => {
+    return lines
+      .map((line) => sanitizeCartLine(line, people))
+      .filter((line): line is CartLine => Boolean(line));
+  }, [lines, people]);
 
-  if (!lines.length) {
+  const totals = useMemo(() => {
+    return validLines.reduce(
+      (total, line) => {
+        const grams = line.grams;
+        const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
+        const nutrition = calcPortion(line.dish.nutrition_per100, grams);
+        const price = (line.dish.price_vnd / yieldG) * grams;
+        return {
+          price: total.price + (Number.isFinite(price) ? price : 0),
+          kcal: total.kcal + (Number.isFinite(nutrition.kcal) ? nutrition.kcal : 0),
+          protein: total.protein + (Number.isFinite(nutrition.protein) ? nutrition.protein : 0),
+        };
+      },
+      { price: 0, kcal: 0, protein: 0 }
+    );
+  }, [validLines]);
+
+  if (!validLines.length) {
     return (
       <div className="border border-dashed border-forest/30 bg-white/60 p-6 text-sm text-muted">
         <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-coral">
@@ -62,16 +72,18 @@ export function MealCustomizer() {
       </div>
 
       <div className="divide-y divide-rule border-b border-rule">
-        {lines.map((line) => {
-          const grams = line.grams;
+        {validLines.map((line) => {
+          const grams = Number.isFinite(line.grams) && line.grams > 0 ? line.grams : (line.dish.min_g || 200);
+          const stepG = line.dish.step_g > 0 ? line.dish.step_g : 50;
+          const yieldG = line.dish.yield_g > 0 ? line.dish.yield_g : 350;
           const suggestedGrams = roundToStep(
-            (line.baseGrams ?? line.dish.min_g) * people,
-            line.dish.step_g
+            (line.baseGrams ?? line.dish.min_g ?? 200) * people,
+            stepG
           );
           const nutrition = calcPortion(line.dish.nutrition_per100, grams);
-          const price = (line.dish.price_vnd / line.dish.yield_g) * grams;
-          const minG = line.dish.min_g;
-          const maxG = line.dish.max_g * people;
+          const price = (line.dish.price_vnd / yieldG) * grams;
+          const minG = line.dish.min_g > 0 ? line.dish.min_g : 200;
+          const maxG = (line.dish.max_g >= minG ? line.dish.max_g : 500) * people;
           const canDecrease = grams > minG;
           const canIncrease = grams < maxG;
 
@@ -115,14 +127,14 @@ export function MealCustomizer() {
                     Gợi ý cho {people} người: {suggestedGrams} g. Số gram ở đây là tổng lượng bạn đặt.
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-muted">
-                    {Math.round(nutrition.kcal)} kcal · Protein {nutrition.protein.toFixed(1)}g
+                    {Math.round(nutrition.kcal || 0)} kcal · Protein {(nutrition.protein ?? 0).toFixed(1)}g
                   </p>
                 </div>
               </div>
 
               <div className="mt-3.5 flex items-center justify-between">
                 <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-muted">
-                  Bước cân ±{line.dish.step_g}g (tối đa {maxG}g)
+                  Bước cân ±{stepG}g (tối đa {maxG}g)
                 </span>
 
                 {/* Bộ điều khiển tăng giảm: tap target 40-44px, affordance rõ ràng */}
@@ -133,7 +145,7 @@ export function MealCustomizer() {
                     onClick={() =>
                       changeGrams(
                         line.dish.id,
-                        Math.max(minG, grams - line.dish.step_g),
+                        Math.max(minG, grams - stepG),
                         true
                       )
                     }
@@ -151,7 +163,7 @@ export function MealCustomizer() {
                     onClick={() =>
                       changeGrams(
                         line.dish.id,
-                        Math.min(maxG, grams + line.dish.step_g),
+                        Math.min(maxG, grams + stepG),
                         true
                       )
                     }
@@ -171,7 +183,7 @@ export function MealCustomizer() {
       <section className="bg-forest p-6 text-white shadow-sm">
         <div className="flex items-baseline justify-between border-b border-white/20 pb-3">
           <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-ivory/80">
-            Tạm tính · {lines.length} món trong khay
+            Tạm tính · {validLines.length} món trong khay
           </span>
           <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-coral">
             Bàn {people} người
@@ -182,12 +194,12 @@ export function MealCustomizer() {
           {formatVnd(Math.round(totals.price))}
         </p>
         <p className="mt-1 font-mono text-xs text-ivory/90">
-          ≈ {Math.round(totals.kcal)} kcal · Protein {totals.protein.toFixed(1)}g (ước tính cả bữa)
+          ≈ {Math.round(totals.kcal)} kcal · Protein {(totals.protein ?? 0).toFixed(1)}g (ước tính cả bữa)
         </p>
 
         <div className="mt-4 border-t border-white/15 pt-3 font-mono text-[11px] text-ivory/70">
-          Bình quân mỗi người nếu chia đều: {formatVnd(Math.round(totals.price / people))} ·{" "}
-          {Math.round(totals.kcal / people)} kcal · P {(totals.protein / people).toFixed(1)}g (ước tính)
+          Bình quân mỗi người nếu chia đều: {formatVnd(Math.round(totals.price / Math.max(1, people)))} ·{" "}
+          {Math.round(totals.kcal / Math.max(1, people))} kcal · P {(((totals.protein ?? 0) / Math.max(1, people))).toFixed(1)}g (ước tính)
         </div>
 
         {/* Primary CTA Coral Orange */}
@@ -195,7 +207,7 @@ export function MealCustomizer() {
           href="/cart"
           className="mt-6 flex w-full items-center justify-center gap-2 bg-coral py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.16em] text-white shadow-md transition-all hover:bg-coral-hover hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2"
         >
-          <span>Đến giỏ hàng &amp; đặt món ({lines.length} món)</span>
+          <span>Đến giỏ hàng &amp; đặt món ({validLines.length} món)</span>
           <span aria-hidden="true">→</span>
         </Link>
       </section>
